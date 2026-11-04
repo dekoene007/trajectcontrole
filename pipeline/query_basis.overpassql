@@ -1,0 +1,12 @@
+[out:json][timeout:180];
+area["ISO3166-1"="BE"]->.be;
+relation["type"="enforcement"]["enforcement"="average_speed"](area.be)->.r;
+.r out body;
+way(r.r)->.sw;
+node(r.r)->.n;
+way(around.n:40)["highway"]->.nw;
+(.sw; .nw;)->.w;
+.w out body;
+node(w.w);
+out skel qt;
+.n out body;

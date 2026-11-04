@@ -1,0 +1,6 @@
+Eigen correcties: zet een bestand correcties.tsv in
+Android/data/be.koen.trajectcontrole/files/  (zelfde formaat als segments.tsv).
+- zelfde id als een bestaand traject = vervangt het
+- limiet 0 = traject uitschakelen
+- nieuw id (bv. 900000001) = extra traject
+Kolommen (tab-gescheiden): id  naam  limiet  tweerichting(0/1)  volgende_ids  lat,lon;lat,lon;...

@@ -1,0 +1,58 @@
+name: Trajectcontroles bijwerken
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"      # elke maandag 03:17 UTC
+  workflow_dispatch: {}        # manueel: tabblad Actions -> Run workflow
+
+permissions:
+  contents: write              # data/ terugschrijven
+  issues: write                # rapport als issue (geeft een e-mail)
+
+concurrency:
+  group: trajecten
+  cancel-in-progress: false
+
+jobs:
+  bijwerken:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pipeline uitvoeren
+        id: pipe
+        continue-on-error: true
+        run: python3 pipeline/run_pipeline.py --data data
+
+      - name: Wijzigingen bewaren
+        # meta.json verandert elke run (laatst_gecontroleerd): zo blijft de wekelijkse planning actief
+        # (GitHub zet geplande workflows uit na 60 dagen zonder activiteit)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "niets te bewaren"
+          else
+            if [ "${{ steps.pipe.outputs.changed }}" = "true" ]; then MSG="Trajecten bijgewerkt"; else MSG="Trajecten gecontroleerd"; fi
+            git commit -m "$MSG ($(date -u +%Y-%m-%d))"
+            git push
+          fi
+
+      - name: Rapport als issue (bij wijziging of fout)
+        if: steps.pipe.outputs.changed == 'true' || steps.pipe.outputs.failed == 'true' || steps.pipe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.pipe.outputs.failed }}" = "true" ] || [ "${{ steps.pipe.outcome }}" = "failure" ]; then
+            TITLE="Trajectcontroles: update NIET gepubliceerd ($(date -u +%Y-%m-%d))"
+          else
+            TITLE="Trajectcontroles bijgewerkt ($(date -u +%Y-%m-%d))"
+          fi
+          if [ ! -s data/RAPPORT.md ]; then echo "Technische fout, zie de log van deze run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > data/RAPPORT.md; fi
+          gh issue create --title "$TITLE" --body-file data/RAPPORT.md
