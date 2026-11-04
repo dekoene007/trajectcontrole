@@ -1,0 +1,7 @@
+# Eigen trajectcontroles, aangevuld op basis van eigen waarneming (niet in OpenStreetMap).
+# Wordt door de wekelijkse update samengevoegd met de OSM-data; zelfde id = vervangt, limiet 0 = uitschakelen.
+# ids 900000000+ zijn eigen trajecten. Kolommen (tab): id naam limiet tweerichting(0/1) volgende_ids lat,lon;lat,lon;...
+#
+# 900000001 Dutselstraat Holsbeek: rit 4/11/2026 14:15 (logboek), camera's volgens eigen waarneming
+#   ~30 m na kruispunt Dunbergweg en ~90 m voor Processieweg (onzekerheid ~30 m). Limiet 50. Beide richtingen: te bevestigen.
+900000001	Trajectcontrole Dutselstraat Holsbeek (eigen)	50	1		50.920579,4.779755;50.920853,4.781524;50.921058,4.782427;50.921408,4.783402;50.922176,4.785088;50.922326,4.785671;50.922475,4.786975;50.922630,4.787630;50.923741,4.790593;50.924106,4.792020;50.924298,4.792554;50.924527,4.793628;50.925487,4.799226

@@ -80,7 +80,43 @@ def read_tsv(path):
     return head, out
 
 
-def report(prev, new, failed_checks, version, published):
+def merge_eigen(tsv_path, eigen_path):
+    """Voegt eigen trajecten toe aan tsv_path (zelfde id = vervangen, limiet 0 = verwijderen). -> lijst eigen ids."""
+    if not os.path.exists(eigen_path): return []
+    eigen = {}
+    for line in open(eigen_path, encoding='utf-8'):
+        if line.startswith('#') or not line.strip(): continue
+        c = line.rstrip('\n').split('\t')
+        if len(c) >= 6 and c[0].lstrip('-').isdigit(): eigen[int(c[0])] = line if line.endswith('\n') else line + '\n'
+    lines = open(tsv_path, encoding='utf-8').readlines()
+    head, body = lines[0], [l for l in lines[1:] if l.strip()]
+    body = [l for l in body if int(l.split('\t')[0]) not in eigen]
+    body += [l for i, l in sorted(eigen.items()) if int(l.split('\t')[2]) > 0]
+    import re
+    head = re.sub(r'aantal=\d+', f'aantal={len(body)}', head)
+    open(tsv_path, 'w', encoding='utf-8').write(head + ''.join(body))
+    log(f'{len(eigen)} eigen traject(en) samengevoegd')
+    return sorted(eigen)
+
+
+def eigen_in_osm(new, eigen_ids):
+    """Eigen trajecten waarvan begin EN einde binnen 60 m van een OSM-traject liggen -> mogelijk dubbel."""
+    def pts(line): return [tuple(map(float, p.split(','))) for p in line.split('\t')[5].strip().split(';')]
+    def d(a, b):
+        k = math.cos(math.radians(a[0])); return math.hypot((b[1]-a[1])*111320*k, (b[0]-a[0])*110540)
+    out = []
+    for e in eigen_ids:
+        if e not in new: continue
+        ep = pts(new[e][3]); a, b = ep[0], ep[-1]
+        for i, v in new.items():
+            if i in eigen_ids or i < 0: continue
+            op = pts(v[3])
+            if min(d(a, p) for p in op) < 60 and min(d(b, p) for p in op) < 60:
+                out.append((e, i)); break
+    return out
+
+
+def report(prev, new, failed_checks, version, published, eigen_ids=()):
     added = sorted(set(new) - set(prev)); removed = sorted(set(prev) - set(new))
     lim = [i for i in sorted(set(new) & set(prev)) if new[i][1] != prev[i][1]]
     geo = [i for i in sorted(set(new) & set(prev)) if new[i][1] == prev[i][1]
@@ -92,7 +128,7 @@ def report(prev, new, failed_checks, version, published):
     r += [f'Trajecten: {len(prev)} → **{len(new)}** · nieuw {len(added)} · verdwenen {len(removed)} · '
           f'limiet gewijzigd {len(lim)} · lengte gewijzigd {len(geo)}' + (f' · versie {version}' if published else ''), '']
 
-    def osm(i): return f'[{i}](https://www.openstreetmap.org/relation/{abs(i)})'
+    def osm(i): return f'{i} (eigen)' if abs(i) >= 900000000 else f'[{i}](https://www.openstreetmap.org/relation/{abs(i)})'
     if added:
         r += ['## Nieuw', '', '| Traject | Naam | Limiet | Lengte |', '|---|---|---|---|']
         r += [f'| {osm(i)} | {new[i][0]} | {new[i][1]} | {new[i][2]/1000:.1f} km |' for i in added] + ['']
@@ -105,6 +141,13 @@ def report(prev, new, failed_checks, version, published):
     if geo:
         r += ['## Lengte gewijzigd (> 5 % of > 200 m)', '', '| Traject | Naam | Was | Nu |', '|---|---|---|---|']
         r += [f'| {osm(i)} | {new[i][0]} | {prev[i][2]/1000:.1f} km | {new[i][2]/1000:.1f} km |' for i in geo] + ['']
+    if eigen_ids:
+        r += ['## Eigen trajecten (data/eigen_trajecten.tsv)', '']
+        r += [f'- {i}: {new[i][0]} ({new[i][1]} km/u, {new[i][2]/1000:.2f} km)' for i in eigen_ids if i in new] + ['']
+        dup = eigen_in_osm(new, set(eigen_ids))
+        if dup:
+            r += ['**Staat nu ook in OpenStreetMap** — de eigen versie kan wellicht weg:', '']
+            r += [f'- eigen {e} ≈ OSM {osm(o)} ({new[o][0]})' for e, o in dup] + ['']
     if not (added or removed or lim or geo) and not failed_checks:
         r += ['Geen wijzigingen.', '']
     return '\n'.join(r), bool(added or removed or lim or geo)
@@ -141,6 +184,9 @@ def main():
     new_tsv = os.path.join(work, 'segments.tsv')
     log(run('export_tsv.py', new_tsv, cwd=work).strip())
 
+    # 4b: eigen trajecten (data/eigen_trajecten.tsv) samenvoegen
+    eigen = merge_eigen(new_tsv, os.path.join(data, 'eigen_trajecten.tsv'))
+
     # 5: controles
     _, prev = read_tsv(os.path.join(data, 'segments.tsv'))
     head, new = read_tsv(new_tsv)
@@ -156,7 +202,7 @@ def main():
 
     # 6: rapport + publiceren
     published = not checks
-    text, changed = report(prev, new, checks, version, published)
+    text, changed = report(prev, new, checks, version, published, eigen)
     open(os.path.join(data, 'RAPPORT.md'), 'w', encoding='utf-8').write(text + '\n')
     meta_p = os.path.join(data, 'meta.json')
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
