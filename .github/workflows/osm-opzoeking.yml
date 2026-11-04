@@ -1,0 +1,26 @@
+name: OSM-opzoeking (hulpmiddel)
+
+# Manueel hulpmiddel: voert een Overpass-query uit en toont het resultaat in de log.
+# Gebruikt om eigen trajecten (data/eigen_trajecten.tsv) op de juiste weg te leggen.
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Overpass QL-query (uitvoer [out:json])"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  opzoeking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Overpass
+        env:
+          Q: ${{ inputs.query }}
+        run: |
+          curl -sS --retry 3 --max-time 300 -A "trajectcontrole-pipeline (github.com/dekoene007/trajectcontrole)" \
+            --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o resultaat.json
+          python3 -c "import json;d=json.load(open('resultaat.json'));print('ELEMENTEN',len(d['elements']));print('RESULTAAT_BEGIN');print(json.dumps(d,separators=(',',':')));print('RESULTAAT_EINDE')"
