@@ -51,12 +51,15 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Android Auto: categorie IOT (eenvoudig scherm zonder kaart; botst niet met Waze-navigatie) -->
+        <!-- Android Auto: eenvoudig scherm zonder kaart; botst niet met Waze-navigatie.
+             POI + IOT in EEN intent-filter: Android Auto (telefoonprojectie) toont een app met enkel IOT
+             niet in de launcher, en leest de categorieen enkel uit de eerste filter. -->
         <service
             android:name=".car.SpeedCarAppService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.POI" />
                 <category android:name="androidx.car.app.category.IOT" />
             </intent-filter>
         </service>
