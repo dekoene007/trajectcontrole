@@ -21,6 +21,11 @@ jobs:
         env:
           Q: ${{ inputs.query }}
         run: |
-          curl -sS --retry 3 --max-time 300 -A "trajectcontrole-pipeline (github.com/dekoene007/trajectcontrole)" \
-            --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o resultaat.json
+          for EP in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter; do
+            echo "probeer $EP"
+            if curl -sS --max-time 120 -A "trajectcontrole-pipeline (github.com/dekoene007/trajectcontrole)" \
+                 --data-urlencode "data=$Q" "$EP" -o resultaat.json && python3 -c "import json;json.load(open('resultaat.json'))['elements']" 2>/dev/null; then
+              break
+            fi
+          done
           python3 -c "import json;d=json.load(open('resultaat.json'));print('ELEMENTEN',len(d['elements']));print('RESULTAAT_BEGIN');print(json.dumps(d,separators=(',',':')));print('RESULTAAT_EINDE')"

@@ -17,7 +17,8 @@ Schrijft voor GitHub Actions 'changed=true/false' en 'failed=true/false' naar $G
 import argparse, datetime, hashlib, json, math, os, shutil, subprocess, sys, tempfile, time, urllib.parse, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']
+ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter',
+             'https://maps.mail.ru/osm/tools/overpass/api/interpreter']
 USER_AGENT = 'trajectcontrole-pipeline/1.0 (github.com/dekoene007/trajectcontrole)'
 
 # --- controles (bewust conservatief) ---
