@@ -1,0 +1,12 @@
+naam;limiet;richting;begin;einde
+# EIGEN MELDINGEN: trajectcontroles die niet in OpenStreetMap staan.
+# Eén regel per trajectcontrole, velden gescheiden door een puntkomma:
+#   naam     : vrije naam, uniek (bv. Tiensesteenweg Kessel-Lo)
+#   limiet   : km/u (bv. 50)
+#   richting : beide  of  een   (een = enkel van begin naar einde)
+#   begin    : plaats van de eerste camera als lat,lon   (Google Maps: lang drukken op de plek -> coördinaten kopiëren)
+#   einde    : plaats van de tweede camera als lat,lon
+# De wekelijkse update legt het traject zelf op de weg en meldt in het rapport (issue) of het gelukt is.
+# Na aanpassen: Actions -> Trajectcontroles bijwerken -> Run workflow, dan in de app: Instellingen -> Trajectdata -> Nu controleren.
+# Regels die met # beginnen worden genegeerd. Voorbeeld:
+# Voorbeeldstraat Gemeente;50;beide;50.92058,4.77975;50.92549,4.79923

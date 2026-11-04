@@ -89,6 +89,9 @@ app (bij openen of starten, hoogstens 1x per dag, enkel op wifi)
 
 - **Faalt een controle, dan wordt er niets gepubliceerd.** Je krijgt een issue "NIET gepubliceerd" met de reden. Het gaat meestal om een tijdelijke fout in OpenStreetMap of bij Overpass. Je kunt de workflow later opnieuw draaien via *Actions → Trajectcontroles bijwerken → Run workflow*.
 - **Manueel controleren in de app:** *Instellingen → Trajectdata → Nu controleren*. Dat werkt ook via mobiele data.
+- **Zelf trajectcontroles toevoegen:** voeg een regel toe aan `data/eigen_meldingen.csv` (op github.com: bestand openen → potloodje → *Commit changes*):
+  `naam;limiet;richting;begin;einde`, bijvoorbeeld `Tiensesteenweg Kessel-Lo;50;beide;50.8812,4.7231;50.8790,4.7342`.
+  Begin en einde zijn de plaatsen van de camera's (Google Maps: lang drukken → coördinaten kopiëren). Start daarna *Actions → Trajectcontroles bijwerken → Run workflow*. Het rapport (issue) toont per regel of het traject op de weg gelegd kon worden, en zo niet, waarom.
 - **Eigen trajecten** die niet in OpenStreetMap staan (vaak gemeentelijke trajectcontroles), komen in `data/eigen_trajecten.tsv` in de repository. De wekelijkse update voegt ze samen met de OSM-data. Het rapport meldt het als zo'n traject later ook in OpenStreetMap opduikt, zodat de eigen versie weg kan. Om ze juist op de weg te leggen is er de workflow *OSM-opzoeking (hulpmiddel)*.
 - **Je eigen `correcties.tsv` gaat altijd voor** op de gedownloade data (zie `app/src/main/assets/LEESMIJ_correcties.txt`).
 - **Zelf draaien (test):** `python3 pipeline/run_pipeline.py --data data`, of `--offline export1.json export2.json` met bestaande exports.

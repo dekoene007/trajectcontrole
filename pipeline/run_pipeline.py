@@ -116,7 +116,7 @@ def eigen_in_osm(new, eigen_ids):
     return out
 
 
-def report(prev, new, failed_checks, version, published, eigen_ids=()):
+def report(prev, new, failed_checks, version, published, eigen_ids=(), meldingen=()):
     added = sorted(set(new) - set(prev)); removed = sorted(set(prev) - set(new))
     lim = [i for i in sorted(set(new) & set(prev)) if new[i][1] != prev[i][1]]
     geo = [i for i in sorted(set(new) & set(prev)) if new[i][1] == prev[i][1]
@@ -148,6 +148,13 @@ def report(prev, new, failed_checks, version, published, eigen_ids=()):
         if dup:
             r += ['**Staat nu ook in OpenStreetMap** — de eigen versie kan wellicht weg:', '']
             r += [f'- eigen {e} ≈ OSM {osm(o)} ({new[o][0]})' for e, o in dup] + ['']
+    if meldingen:
+        r += ['## Eigen meldingen (data/eigen_meldingen.csv)', '', '| Regel | Naam | Resultaat |', '|---|---|---|']
+        for m in meldingen:
+            res = ('⚠ ' + '; '.join(dict.fromkeys(m['fouten']))) if m['fouten'] else \
+                  f"✓ {m['limiet']} km/u, {m.get('lengte', 0)/1000:.2f} km" + (', beide richtingen' if len(m.get('ids', [])) == 2 else '')
+            r.append(f"| {m['regel']} | {m['naam']} | {res} |")
+        r.append('')
     if not (added or removed or lim or geo) and not failed_checks:
         r += ['Geen wijzigingen.', '']
     return '\n'.join(r), bool(added or removed or lim or geo)
@@ -163,22 +170,49 @@ def main():
     work = tempfile.mkdtemp(prefix='tc_')
     log('werkmap', work)
 
+    # 0: eigen meldingen (data/eigen_meldingen.csv) -> nagemaakte relaties
+    meld_json = os.path.join(work, 'meldingen.json')
+    meld_csv = os.path.join(data, 'eigen_meldingen.csv')
+    meldingen = []
+    if os.path.exists(meld_csv):
+        meldingen = json.loads(run('meldingen.py', meld_csv, meld_json, cwd=work))
+        log(f'{len(meldingen)} eigen melding(en) gelezen')
+    else:
+        json.dump({'elements': []}, open(meld_json, 'w'))
+
     # 1-3: ophalen en verwerken
     if a.offline:
-        exports = [os.path.abspath(p) for p in a.offline]
+        exports = [os.path.abspath(p) for p in a.offline] + [meld_json]
         run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
     else:
         e1 = os.path.join(work, 'export1.json')
         log('basisquery…'); overpass(open(os.path.join(HERE, 'query_basis.overpassql')).read(), e1)
-        run('enrich.py', e1, cwd=work); run('build_segments.py', e1, cwd=work)
+        run('enrich.py', e1, meld_json, cwd=work); run('build_segments.py', e1, meld_json, cwd=work)
         q2 = os.path.join(work, 'aanvulling.overpassql')
-        log(run('gen_aanvulling.py', e1, q2, cwd=work).strip())
-        exports = [e1]
+        log(run('gen_aanvulling.py', e1, meld_json, q2, cwd=work).strip())
+        exports = [e1, meld_json]
         if open(q2).read().count('way(around') > 0:
             e2 = os.path.join(work, 'export2.json')
             log('aanvullende query…'); overpass(open(q2).read(), e2)
             exports.append(e2)
         run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
+
+    # status per eigen melding (uit de verwerking)
+    segv2 = {x['id']: x for x in json.load(open(os.path.join(work, 'segments_v2.json')))['segments']}
+    for m in meldingen:
+        for i in m.get('ids', []):
+            sg = segv2.get(i)
+            if sg is None: m['fouten'].append('niet verwerkt'); continue
+            if sg['status'] != 'ok':
+                uitleg = {'geen_route_gevonden': 'geen weg gevonden tussen begin en einde (ligt een punt naast de weg?)',
+                          'niet_op_weg_te_leggen': 'begin of einde ligt te ver van een weg',
+                          'omweg_verdacht': 'de route maakt een grote omweg: kijk begin en einde na',
+                          'route_te_kort': 'traject korter dan 100 m',
+                          'verdacht_kort': 'begin en einde liggen bijna op dezelfde plek',
+                          'start_einde_tegen_rijrichting': 'lijkt tegen de rijrichting in (eenrichtingsweg?)'}
+                m['fouten'] += [uitleg.get(x, x) for x in sg['issues'] if x not in ('maxspeed_uit_weg', 'maxspeed_van_buur')] or ['niet bruikbaar']
+            else:
+                m.setdefault('lengte', round(sg['length_m']))
 
     # 4: export
     new_tsv = os.path.join(work, 'segments.tsv')
@@ -202,7 +236,7 @@ def main():
 
     # 6: rapport + publiceren
     published = not checks
-    text, changed = report(prev, new, checks, version, published, eigen)
+    text, changed = report(prev, new, checks, version, published, eigen, meldingen)
     open(os.path.join(data, 'RAPPORT.md'), 'w', encoding='utf-8').write(text + '\n')
     meta_p = os.path.join(data, 'meta.json')
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
