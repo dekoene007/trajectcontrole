@@ -43,7 +43,7 @@ def overpass(query, out_path, min_relations=0):
         for ep in ENDPOINTS:
             try:
                 req = urllib.request.Request(ep, data=body, headers={'User-Agent': USER_AGENT})
-                with urllib.request.urlopen(req, timeout=900) as r:
+                with urllib.request.urlopen(req, timeout=240) as r:
                     raw = r.read()
                 d = json.loads(raw)
                 if 'elements' not in d: raise ValueError('geen elements in antwoord')
@@ -59,7 +59,7 @@ def overpass(query, out_path, min_relations=0):
                 return nrel
             except Exception as e:
                 last = e; log(f'  {ep} mislukt: {e}')
-        time.sleep(60 * (attempt + 1))
+        time.sleep(30 * (attempt + 1))
     if best is not None and best[0] >= 0.9 * min_relations:
         log(f'  geen server voldeed volledig; beste antwoord gebruikt: {best[2]} ({best[0]} relaties)')
         open(out_path, 'wb').write(best[1]); return best[0]
@@ -154,6 +154,35 @@ def link_all(tsv_path, max_gap=200, max_turn=60):
         c[4] = ','.join(str(x) for x in sorted(have))
     open(tsv_path, 'w', encoding='utf-8').write(head + ''.join('\t'.join(c) + '\n' for c in body))
     log(f'{added} extra koppeling(en) tussen trajecten')
+
+
+OSM_FALLBACK = [False]
+MELD_PREV = []
+
+
+def osm_available(work, data, meld_json):
+    """Test of Overpass antwoordt (kleine query). Zo niet: bouw segments_v2.json uit de OSM-trajecten van
+    de vorige gepubliceerde versie, zodat AWV en eigen trajecten toch verwerkt worden."""
+    probe = os.path.join(work, 'probe.json')
+    try:
+        overpass('[out:json][timeout:25];relation["enforcement"="average_speed"](50.8,4.6,50.95,4.9);out ids;', probe)
+        return True
+    except Exception as e:
+        log('Overpass onbereikbaar, OSM-trajecten van de vorige versie worden hergebruikt:', e)
+    prev = os.path.join(data, 'segments.tsv')
+    segs = []
+    for l in open(prev, encoding='utf-8'):
+        if l.startswith('#') or not l.strip(): continue
+        c = l.rstrip('\n').split('\t'); i = int(c[0])
+        if i >= AWV_MIN: continue   # AWV / eigen worden opnieuw opgebouwd
+        pts = [list(map(float, q.split(','))) for q in c[5].split(';')]
+        segs.append(dict(id=i, name=c[1], description=None, maxspeed=int(c[2]), status='ok', bidirectional=c[3] == '1',
+                         polyline=pts, issues=[], start=None, end=None, length_m=None))
+    chains = [dict(van=int(l.split('\t')[0]), naar=int(n)) for l in open(prev, encoding='utf-8') if not l.startswith('#') and l.strip()
+              for n in l.split('\t')[4].split(',') if n and int(l.split('\t')[0]) < AWV_MIN and int(n) < AWV_MIN]
+    json.dump(dict(segments=segs, chains=chains), open(os.path.join(work, 'segments_v2.json'), 'w'))
+    OSM_FALLBACK[0] = True
+    return False
 
 
 def merge_eigen(tsv_path, eigen_path):
@@ -279,6 +308,8 @@ def main():
     if a.offline:
         exports = [os.path.abspath(p) for p in a.offline] + [meld_json]
         run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
+    elif not osm_available(work, data, meld_json):
+        pass   # terugvalmodus: segments_v2.json is opgebouwd uit de vorige versie
     else:
         e1 = os.path.join(work, 'export1.json')
         meta_prev = json.load(open(os.path.join(data, 'meta.json'))) if os.path.exists(os.path.join(data, 'meta.json')) else {}
@@ -297,6 +328,12 @@ def main():
 
     # status per eigen melding (uit de verwerking)
     segv2 = {x['id']: x for x in json.load(open(os.path.join(work, 'segments_v2.json')))['segments']}
+    if OSM_FALLBACK[0]:
+        # meldingen konden niet op de weg gelegd worden; vorige versie ervan behouden
+        prev_rows = [l for l in open(os.path.join(data, 'segments.tsv'), encoding='utf-8')
+                     if not l.startswith('#') and l.strip() and 910_000_000 <= int(l.split('\t')[0]) < 1_000_000_000]
+        for m in meldingen: m['fouten'].append('OpenStreetMap onbereikbaar: vorige versie behouden')
+        MELD_PREV[:] = prev_rows
     for m in meldingen:
         for i in m.get('ids', []):
             sg = segv2.get(i)
@@ -315,6 +352,8 @@ def main():
     # 4: export
     new_tsv = os.path.join(work, 'segments.tsv')
     log(run('export_tsv.py', new_tsv, cwd=work).strip())
+    if OSM_FALLBACK[0] and MELD_PREV:
+        with open(new_tsv, 'a', encoding='utf-8') as fh: fh.write(''.join(MELD_PREV))
 
     # 4b: eigen trajecten (data/eigen_trajecten.tsv) samenvoegen
     eigen = merge_eigen(new_tsv, os.path.join(data, 'eigen_trajecten.tsv'))
@@ -347,7 +386,7 @@ def main():
     meta_p = os.path.join(data, 'meta.json')
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
     meta['laatst_gecontroleerd'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%MZ')
-    if published and OSM_REL[0]: meta['osm_relaties'] = OSM_REL[0]
+    if published and OSM_REL[0] and not OSM_FALLBACK[0]: meta['osm_relaties'] = OSM_REL[0]
     if published and (changed or not prev):
         shutil.copy(new_tsv, os.path.join(data, 'segments.tsv'))
         meta.update(versie=version, aantal=len(new), datum=meta['laatst_gecontroleerd'],
