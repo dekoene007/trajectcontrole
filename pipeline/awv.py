@@ -194,7 +194,8 @@ def build(tc_path, reg_path, ours_tsv, out_tsv):
         for c in sorted(rows, key=lambda c: c['id']):
             cands = by_from.get(c['p_to'], []) if c['p_to'] and c['p_to'] != 'UNK' else []
             nxt = ','.join(str(i) for i in cands if i != c['id'] and next_ok(c, byid[i]))
-            name = f"Trajectcontrole {c['weg'][0]}{int(c['weg'][1:5])} AWV {c['cid']}"
+            w = c['weg']; road = f"{w[0]}{int(w[1:4])}" + (w[4] if len(w) > 4 and w[4].isalpha() else '')
+            name = f"Trajectcontrole {road} AWV {c['cid']}"
             poly = ';'.join(f'{a:.6f},{b:.6f}' for a, b in c['pts'])
             f.write(f"{c['id']}\t{name}\t{c['lim']}\t0\t{nxt}\t{poly}\n")
     summ['limiet_onzeker'] = sum(1 for c in rows if c['share'] < 0.8)
