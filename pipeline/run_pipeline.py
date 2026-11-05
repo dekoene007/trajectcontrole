@@ -34,7 +34,7 @@ OSM_REL = [None]
 def log(*a): print(*a, flush=True)
 
 
-def overpass(query, out_path, min_relations=0):
+def overpass(query, out_path, min_relations=0, min_elements=0):
     """Haalt op bij de eerste server met een geldig antwoord. min_relations: weiger een antwoord met
     duidelijk minder relaties (verouderde spiegelserver) en probeer de volgende; zo niet, neem het beste."""
     body = urllib.parse.urlencode({'data': query}).encode()
@@ -51,6 +51,8 @@ def overpass(query, out_path, min_relations=0):
                     raise ValueError('Overpass-fout: ' + d['remark'][:200])
                 nrel = sum(1 for e in d['elements'] if e['type'] == 'relation')
                 log(f'  {ep}: {len(d["elements"])} elementen, {nrel} relaties')
+                if len(d['elements']) < min_elements:
+                    raise ValueError(f'te weinig elementen ({len(d["elements"])} < {min_elements}), server overbelast?')
                 if nrel < min_relations:
                     log(f'  -> minder relaties dan verwacht ({min_relations}), mogelijk verouderde server; volgende proberen')
                     if best is None or nrel > best[0]: best = (nrel, raw, ep)
@@ -169,6 +171,12 @@ def osm_available(work, data, meld_json):
         return True
     except Exception as e:
         log('Overpass onbereikbaar, OSM-trajecten van de vorige versie worden hergebruikt:', e)
+    osm_fallback(work, data)
+    return False
+
+
+def osm_fallback(work, data):
+    """segments_v2.json opbouwen uit de OSM-trajecten van de vorige gepubliceerde versie."""
     prev = os.path.join(data, 'segments.tsv')
     segs = []
     for l in open(prev, encoding='utf-8'):
@@ -182,7 +190,6 @@ def osm_available(work, data, meld_json):
               for n in l.split('\t')[4].split(',') if n and int(l.split('\t')[0]) < AWV_MIN and int(n) < AWV_MIN]
     json.dump(dict(segments=segs, chains=chains), open(os.path.join(work, 'segments_v2.json'), 'w'))
     OSM_FALLBACK[0] = True
-    return False
 
 
 def merge_eigen(tsv_path, eigen_path):
@@ -311,20 +318,26 @@ def main():
     elif not osm_available(work, data, meld_json):
         pass   # terugvalmodus: segments_v2.json is opgebouwd uit de vorige versie
     else:
-        e1 = os.path.join(work, 'export1.json')
-        meta_prev = json.load(open(os.path.join(data, 'meta.json'))) if os.path.exists(os.path.join(data, 'meta.json')) else {}
-        verwacht = int(meta_prev.get('osm_relaties', 0) * 0.98)
-        log('basisquery…'); nrel = overpass(open(os.path.join(HERE, 'query_basis.overpassql')).read(), e1, verwacht)
-        OSM_REL[0] = nrel
-        run('enrich.py', e1, meld_json, cwd=work); run('build_segments.py', e1, meld_json, cwd=work)
-        q2 = os.path.join(work, 'aanvulling.overpassql')
-        log(run('gen_aanvulling.py', e1, meld_json, q2, cwd=work).strip())
-        exports = [e1, meld_json]
-        if open(q2).read().count('way(around') > 0:
-            e2 = os.path.join(work, 'export2.json')
-            log('aanvullende query…'); overpass(open(q2).read(), e2)
-            exports.append(e2)
-        run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
+        try:
+            e1 = os.path.join(work, 'export1.json')
+            meta_prev = json.load(open(os.path.join(data, 'meta.json'))) if os.path.exists(os.path.join(data, 'meta.json')) else {}
+            verwacht = int(meta_prev.get('osm_relaties', 0) * 0.98)
+            log('basisquery…'); nrel = overpass(open(os.path.join(HERE, 'query_basis.overpassql')).read(), e1, verwacht)
+            OSM_REL[0] = nrel
+            run('enrich.py', e1, meld_json, cwd=work); run('build_segments.py', e1, meld_json, cwd=work)
+            q2 = os.path.join(work, 'aanvulling.overpassql')
+            log(run('gen_aanvulling.py', e1, meld_json, q2, cwd=work).strip())
+            exports = [e1, meld_json]
+            if open(q2).read().count('way(around') > 0:
+                e2 = os.path.join(work, 'export2.json')
+                n_q = open(q2).read().count('way(around')
+                log('aanvullende query…'); overpass(open(q2).read(), e2, min_elements=n_q)
+                exports.append(e2)
+            run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
+        except Exception as e:
+            log('OSM-verwerking mislukt, OSM-trajecten van de vorige versie worden hergebruikt:', e)
+            OSM_REL[0] = None
+            osm_fallback(work, data)
 
     # status per eigen melding (uit de verwerking)
     segv2 = {x['id']: x for x in json.load(open(os.path.join(work, 'segments_v2.json')))['segments']}
@@ -376,6 +389,12 @@ def main():
         checks.append(f'{len(new)} trajecten, meer dan {int(MAX_DROP*100)} % minder dan vorige versie ({len(prev)})')
     n_e40 = sum(1 for v in new.values() if 'E40' in v[0] or ' A10 ' in v[0] or ' A3 ' in v[0])   # E40 = A10 + A3
     if n_e40 < MIN_E40: checks.append(f'E40 onvolledig: {n_e40} trajecten (minimum {MIN_E40})')
+    # OSM-trajecten mogen niet stilletjes wegvallen (AWV-groei maskeert dat anders in het totaal)
+    prev_osm = {i for i in prev if 0 < abs(i) < AWV_MIN}
+    vervangen = {x['ons'] for x in (awv or {}).get('vervangen', [])}
+    weg_osm = prev_osm - set(new) - vervangen
+    if prev_osm and len(weg_osm) > MAX_DROP * len(prev_osm):
+        checks.append(f'{len(weg_osm)} van {len(prev_osm)} OSM-trajecten verdwenen zonder AWV-vervanging')
     short = [i for i, v in new.items() if v[2] < 100]
     if short: checks.append(f'{len(short)} trajecten korter dan 100 m: {short[:5]}')
 
