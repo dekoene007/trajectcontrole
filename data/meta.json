@@ -3,5 +3,6 @@
  "versie": 202611051630,
  "aantal": 364,
  "datum": "2026-11-05T16:30Z",
- "sha256": "d3aac0e8cdcf5593b0b50f2ad49858e7bec14e09a06604d5ec5aae90b787ea2d"
+ "sha256": "d3aac0e8cdcf5593b0b50f2ad49858e7bec14e09a06604d5ec5aae90b787ea2d",
+ "osm_relaties": 177
 }

@@ -28,14 +28,17 @@ MIN_E40 = 15                # E40 moet (bijna) volledig blijven (nu 17)
 
 
 DATA_DIR = None
+OSM_REL = [None]
 
 
 def log(*a): print(*a, flush=True)
 
 
-def overpass(query, out_path):
+def overpass(query, out_path, min_relations=0):
+    """Haalt op bij de eerste server met een geldig antwoord. min_relations: weiger een antwoord met
+    duidelijk minder relaties (verouderde spiegelserver) en probeer de volgende; zo niet, neem het beste."""
     body = urllib.parse.urlencode({'data': query}).encode()
-    last = None
+    last = None; best = None
     for attempt in range(3):
         for ep in ENDPOINTS:
             try:
@@ -46,12 +49,21 @@ def overpass(query, out_path):
                 if 'elements' not in d: raise ValueError('geen elements in antwoord')
                 if 'remark' in d and ('error' in d['remark'].lower() or 'timed out' in d['remark'].lower()):
                     raise ValueError('Overpass-fout: ' + d['remark'][:200])
+                nrel = sum(1 for e in d['elements'] if e['type'] == 'relation')
+                log(f'  {ep}: {len(d["elements"])} elementen, {nrel} relaties')
+                if nrel < min_relations:
+                    log(f'  -> minder relaties dan verwacht ({min_relations}), mogelijk verouderde server; volgende proberen')
+                    if best is None or nrel > best[0]: best = (nrel, raw, ep)
+                    continue
                 open(out_path, 'wb').write(raw)
-                log(f'  {ep}: {len(d["elements"])} elementen')
-                return
+                return nrel
             except Exception as e:
                 last = e; log(f'  {ep} mislukt: {e}')
+        if best is not None: break
         time.sleep(60 * (attempt + 1))
+    if best is not None:
+        log(f'  geen server voldeed; beste antwoord gebruikt: {best[2]} ({best[0]} relaties)')
+        open(out_path, 'wb').write(best[1]); return best[0]
     raise RuntimeError(f'Overpass onbereikbaar: {last}')
 
 
@@ -233,7 +245,10 @@ def main():
         run('enrich.py', *exports, cwd=work); log(run('build_segments.py', *exports, cwd=work).strip())
     else:
         e1 = os.path.join(work, 'export1.json')
-        log('basisquery…'); overpass(open(os.path.join(HERE, 'query_basis.overpassql')).read(), e1)
+        meta_prev = json.load(open(os.path.join(data, 'meta.json'))) if os.path.exists(os.path.join(data, 'meta.json')) else {}
+        verwacht = int(meta_prev.get('osm_relaties', 0) * 0.98)
+        log('basisquery…'); nrel = overpass(open(os.path.join(HERE, 'query_basis.overpassql')).read(), e1, verwacht)
+        OSM_REL[0] = nrel
         run('enrich.py', e1, meld_json, cwd=work); run('build_segments.py', e1, meld_json, cwd=work)
         q2 = os.path.join(work, 'aanvulling.overpassql')
         log(run('gen_aanvulling.py', e1, meld_json, q2, cwd=work).strip())
@@ -293,6 +308,7 @@ def main():
     meta_p = os.path.join(data, 'meta.json')
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
     meta['laatst_gecontroleerd'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%MZ')
+    if published and OSM_REL[0]: meta['osm_relaties'] = OSM_REL[0]
     if published and (changed or not prev):
         shutil.copy(new_tsv, os.path.join(data, 'segments.tsv'))
         meta.update(versie=version, aantal=len(new), datum=meta['laatst_gecontroleerd'],
