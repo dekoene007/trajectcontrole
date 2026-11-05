@@ -197,9 +197,12 @@ def report(prev, new, failed_checks, version, published, eigen_ids=(), meldingen
                   f"✓ {m['limiet']} km/u, {m.get('lengte', 0)/1000:.2f} km" + (', beide richtingen' if len(m.get('ids', [])) == 2 else '')
             r.append(f"| {m['regel']} | {m['naam']} | {res} |")
         r.append('')
-    if not (added or removed or lim or geo) and not failed_checks:
+    other = [i for i in sorted(set(new) & set(prev)) if new[i][3] != prev[i][3] and i not in lim and i not in geo]
+    if other:
+        r += [f'Overige kleine wijzigingen (naam, koppeling of lijn < 5 %): {len(other)} trajecten.', '']
+    if not (added or removed or lim or geo or other) and not failed_checks:
         r += ['Geen wijzigingen.', '']
-    return '\n'.join(r), bool(added or removed or lim or geo)
+    return '\n'.join(r), bool(added or removed or lim or geo or other)
 
 
 def main():
