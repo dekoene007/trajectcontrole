@@ -1,39 +1,7 @@
 # Trajectcontroles: update 2026-11-05
 
-Trajecten: 364 → **364** · nieuw 0 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611051655
+**NIET GEPUBLICEERD: technische fout.** De app houdt de vorige versie.
 
-## Eigen trajecten (data/eigen_trajecten.tsv)
+`build_segments.py faalde`
 
-- 900000001: Trajectcontrole Dutselstraat Holsbeek (eigen) (50 km/u, 1.48 km)
-
-## AWV open data
-
-Bron: AWV open data (vandaag opgehaald). Geplaatst volgens AWV: 287 · al aanwezig: 25 · toegevoegd: 222 · limiet onzeker (wisselt onderweg): 15
-
-Overlapt met een bestaand traject maar met **andere lengte** (bestaande versie behouden — na te kijken):
-
-| AWV | AWV-lengte | Bestaand traject | Lengte |
-|---|---|---|---|
-| TC0176 A0100002 93->92.5 | 0.50 km | Trajectcontrole E40: Torhout-Jabbeke | 11.83 km |
-| TC0068 N2820001 4.4->6.4 | 2.19 km | Traject 17450819 | 1.93 km |
-| TC0087 R0410001 1.5->2.3 | 0.80 km | Trajectcontrole R41 Siesegemlaan-Boudewijnlaan | 0.96 km |
-| TC2021_242 N1110002 7.6->9.1 | 1.49 km | Traject 17877953 | 1.94 km |
-| TC0109 N1180001 5.7->9.1 | 3.38 km | Traject 19266150 | 4.14 km |
-| TC0140 A0100002 33.2->25.8 | 7.38 km | Trajectcontrole E40 Merelbeke-Wetteren | 13.73 km |
-| TC0172 A0100001 44.9->52.4 | 7.48 km | Trajectcontrole E40 Zwijnaarde-Drongen | 9.63 km |
-| TC0173 A0100001 52.4->62 | 9.58 km | Trajectcontrole E40 Drongen-Aalter | 12.05 km |
-| TC0152 N7300001 4.1->7.9 | 3.79 km | Trajectcontrole Tongersesteenweg ri Hoeselt | 2.52 km |
-| TC0208 N0370001 6.2->11.2 | 4.95 km | N37 Tielt - Ruiselede | 4.38 km |
-| FEDPOL A0100001 82.4->92.6 | 10.20 km | Trajectcontrole E40: Loppem-Jabbeke | 8.12 km |
-| TC0176 A0180001 36->46.5 | 10.47 km | Trajectcontrole E40: Torhout-Jabbeke | 11.83 km |
-| TCAW0008 N0130001 22.4->24.2 | 1.78 km | Traject 20088611 | 2.05 km |
-
-Niet opgenomen:
-
-- FEDPOL A0140001 0.4->54.2: lengte 53621 m
-- TC0077 N0060001 6.6->7.5: lijn 1478 m past niet bij referentiepunten 900 m
-- TC0124 R0130001 0.5->9.4: lijn 2300 m past niet bij referentiepunten 8900 m
-- TC2021_339 N0080002 68->66: lijn 6780 m past niet bij referentiepunten 2000 m
-
-Overige kleine wijzigingen (naam, koppeling of lijn < 5 %): 222 trajecten.
-
+Meestal is Overpass tijdelijk overbelast; de volgende wekelijkse run probeert opnieuw. Manueel herstarten kan via Actions → Run workflow.
