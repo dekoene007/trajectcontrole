@@ -59,12 +59,11 @@ def overpass(query, out_path, min_relations=0):
                 return nrel
             except Exception as e:
                 last = e; log(f'  {ep} mislukt: {e}')
-        if best is not None: break
         time.sleep(60 * (attempt + 1))
-    if best is not None:
-        log(f'  geen server voldeed; beste antwoord gebruikt: {best[2]} ({best[0]} relaties)')
+    if best is not None and best[0] >= 0.9 * min_relations:
+        log(f'  geen server voldeed volledig; beste antwoord gebruikt: {best[2]} ({best[0]} relaties)')
         open(out_path, 'wb').write(best[1]); return best[0]
-    raise RuntimeError(f'Overpass onbereikbaar: {last}')
+    raise RuntimeError(f'Overpass: geen bruikbaar antwoord (beste: {best[0] if best else 0} relaties, verwacht ~{min_relations}; laatste fout: {last})')
 
 
 def run(script, *args, cwd):
