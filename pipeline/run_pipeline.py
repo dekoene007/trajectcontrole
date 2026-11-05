@@ -115,6 +115,10 @@ def add_awv(tsv_path, work, offline, prev_tsv):
         summ = dict(bron=f'AWV niet bereikbaar ({e}); vorige versie behouden', nieuw=new_rows.count('\n'))
     lines = open(tsv_path, encoding='utf-8').readlines()
     head, body = lines[0], [l for l in lines[1:] if l.strip()]
+    weg = {x['ons'] for x in summ.get('vervangen', [])}
+    if weg:
+        body = [l for l in body if abs(int(l.split('\t')[0])) not in weg]
+        log(f'AWV vervangt {len(weg)} OSM-traject(en)')
     body += [l if l.endswith('\n') else l + '\n' for l in new_rows.splitlines(True) if l.strip()]
     import re
     head = re.sub(r'aantal=\d+', f'aantal={len(body)}', head)
@@ -122,6 +126,35 @@ def add_awv(tsv_path, work, offline, prev_tsv):
     open(tsv_path, 'w', encoding='utf-8').write(head + ''.join(body))
     log(f"AWV: {summ.get('nieuw', 0)} trajecten toegevoegd")
     return summ
+
+
+def link_all(tsv_path, max_gap=200, max_turn=60):
+    """Vult 'volgende ids' aan: traject B volgt op A als B binnen max_gap m na het einde van A begint
+    en de rijrichting doorloopt. Bestaande koppelingen blijven. Tweerichtingstrajecten: enkel voorwaarts."""
+    lines = open(tsv_path, encoding='utf-8').readlines()
+    head, body = lines[0], [l.rstrip('\n').split('\t') for l in lines[1:] if l.strip()]
+    def P(c): return [tuple(map(float, q.split(','))) for q in c[5].split(';')]
+    def d(a, b):
+        k = math.cos(math.radians(a[0])); return math.hypot((b[1]-a[1])*111320*k, (b[0]-a[0])*110540)
+    def hd(a, b):
+        k = math.cos(math.radians(a[0])); return (math.degrees(math.atan2((b[1]-a[1])*k, b[0]-a[0])) + 360) % 360
+    info = []
+    for c in body:
+        p = P(c); info.append((int(c[0]), p[0], p[-1], hd(p[0], p[1]), hd(p[-2], p[-1])))
+    starts = sorted(info, key=lambda x: x[1][0])
+    import bisect
+    lats = [x[1][0] for x in starts]
+    added = 0
+    for c, (i, s0, e0, h0, he) in zip(body, info):
+        have = {int(x) for x in c[4].split(',') if x}
+        lo, hi = bisect.bisect_left(lats, e0[0]-0.003), bisect.bisect_right(lats, e0[0]+0.003)
+        for j, s1, _, h1, _ in starts[lo:hi]:
+            if j == i or j in have: continue
+            if d(e0, s1) <= max_gap and min(abs(he-h1) % 360, 360 - abs(he-h1) % 360) < max_turn:
+                have.add(j); added += 1
+        c[4] = ','.join(str(x) for x in sorted(have))
+    open(tsv_path, 'w', encoding='utf-8').write(head + ''.join('\t'.join(c) + '\n' for c in body))
+    log(f'{added} extra koppeling(en) tussen trajecten')
 
 
 def merge_eigen(tsv_path, eigen_path):
@@ -196,6 +229,10 @@ def report(prev, new, failed_checks, version, published, eigen_ids=(), meldingen
         r += ['## AWV open data', '', f"Bron: {awv.get('bron')}. "
               f"Geplaatst volgens AWV: {awv.get('geplaatst', '?')} · al aanwezig: {awv.get('zelfde', '?')} · "
               f"toegevoegd: {awv.get('nieuw', '?')} · limiet onzeker (wisselt onderweg): {awv.get('limiet_onzeker', '?')}", '']
+        if awv.get('vervangen'):
+            r += ['Vervangen door AWV-portaalstukken (OSM voegde stukken samen of week af):', '',
+                  '| Bestaand traject | Lengte | Vervangen door |', '|---|---|---|']
+            r += [f"| {x['ons_naam']} | {x['ons_m']/1000:.2f} km | {'; '.join(x['door'])} |" for x in awv['vervangen']] + ['']
         if awv.get('lengteverschil'):
             r += ['Overlapt met een bestaand traject maar met **andere lengte** (bestaande versie behouden — na te kijken):', '',
                   '| AWV | AWV-lengte | Bestaand traject | Lengte |', '|---|---|---|---|']
@@ -288,6 +325,9 @@ def main():
     if not a.zonder_awv:
         awv = add_awv(new_tsv, work, a.awv_offline, os.path.join(data, 'segments.tsv'))
 
+    # 4d: aaneensluitende trajecten koppelen over alle bronnen heen
+    link_all(new_tsv)
+
     # 5: controles
     _, prev = read_tsv(os.path.join(data, 'segments.tsv'))
     head, new = read_tsv(new_tsv)
@@ -296,7 +336,7 @@ def main():
     if len(new) < MIN_SEGMENTS: checks.append(f'slechts {len(new)} trajecten (minimum {MIN_SEGMENTS})')
     if prev and len(new) < (1 - MAX_DROP) * len(prev):
         checks.append(f'{len(new)} trajecten, meer dan {int(MAX_DROP*100)} % minder dan vorige versie ({len(prev)})')
-    n_e40 = sum(1 for v in new.values() if 'E40' in v[0])
+    n_e40 = sum(1 for v in new.values() if 'E40' in v[0] or ' A10 ' in v[0] or ' A3 ' in v[0])   # E40 = A10 + A3
     if n_e40 < MIN_E40: checks.append(f'E40 onvolledig: {n_e40} trajecten (minimum {MIN_E40})')
     short = [i for i, v in new.items() if v[2] < 100]
     if short: checks.append(f'{len(short)} trajecten korter dan 100 m: {short[:5]}')

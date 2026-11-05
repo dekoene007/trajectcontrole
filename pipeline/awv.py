@@ -168,7 +168,27 @@ def build(tc_path, reg_path, ours_tsv, out_tsv):
         cand.append(dict(tid=tid, cid=p['TjCID'], weg=p['Wegnummer'], status=st, lim=lim, share=share, pts=pts, L=L,
                          p_from=portals[0] if len(portals) == 2 else None, p_to=portals[-1] if len(portals) == 2 else None,
                          id=BASE_ID + (zlib.crc32(f"{p['Wegnummer']}|{p['Van referentiepunt']}|{p['Tot referentiepunt']}".encode()) % 50_000_000) * 2))
-    # vergelijken met wat we al hebben (OSM + eigen)
+    # 1. OSM-trajecten die voor >= 80 % door AWV-portaalstukken (zelfde rijrichting) bedekt worden: AWV wint.
+    #    (OSM voegt soms meerdere AWV-stukken samen; de politie meet per portaalpaar.) Eigen trajecten nooit.
+    candL = [(c, Line(c['pts'])) for c in cand]
+    replaced = {}
+    for oid, name, B in ours:
+        if abs(oid) >= 900_000_000: continue
+        S = B.samples(50); cov = [False]*len(S); users = []
+        for c, A in candL:
+            if A.box[1] + 0.01 < B.box[0] or A.box[0] - 0.01 > B.box[1] or A.box[3] + 0.015 < B.box[2] or A.box[2] - 0.015 > B.box[3]:
+                continue
+            hit = False
+            for k, (pnt, h) in enumerate(S):
+                d, _, ah = A.proj(pnt)
+                if d < 40 and angd(h, ah) < 45: cov[k] = True; hit = True
+            if hit: users.append(c['tid'])
+        if users and sum(cov)/len(S) >= 0.8:
+            replaced[abs(oid)] = (name, users, round(B.L))
+    summ['vervangen'] = [dict(ons=k, ons_naam=v[0], ons_m=v[2], door=v[1]) for k, v in replaced.items()]
+    ours = [(oid, n, B) for oid, n, B in ours if abs(oid) not in replaced]
+
+    # 2. vergelijken met wat overblijft (OSM + eigen)
     rows = []
     for c in cand:
         A = Line(c['pts']); best = None
