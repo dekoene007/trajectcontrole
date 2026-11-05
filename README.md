@@ -72,6 +72,16 @@ Weigert Android het starten toch, dan krijg je een melding *Tik om te starten*.
 - **Eerste echte rit:** laat Flitsmeister en deze app naast elkaar draaien. Het logboek staat in `Android/data/be.koen.trajectcontrole/files/logs/`.
   - De `FIX`-regels kunnen opnieuw door de rekenmotor gestuurd worden. Zo kan elk verschil achteraf onderzocht worden.
 
+## Bronnen
+
+1. **OpenStreetMap** (ODbL): alle Belgische `enforcement=average_speed`-relaties.
+2. **AWV open data** (laag `awv:Trajectcontroles` op de open-dataserver van het Agentschap Wegen en Verkeer): trajectcontroles op Vlaamse gewest- en snelwegen.
+   - Opgenomen: status *Opgeleverd* (ook als ze niet actief zijn) en *UNKNOWN*. Die laatste zijn installaties van de federale politie en de politiezones die AWV mee registreert.
+   - De limiet komt uit de AWV-laag `Snelheidsregimes_op_wegen_in_beheer_van_AWV`.
+   - Opgelet: de coördinaten staan in Lambert 2008 terwijl de laag Lambert 72 opgeeft. De pipeline rekent ze zelf om.
+   - Overlapt een AWV-traject met een bestaand traject maar verschilt de lengte, dan blijft de bestaande versie staan en meldt het rapport het verschil.
+3. **Eigen meldingen** (`data/eigen_meldingen.csv`) en **eigen trajecten** (`data/eigen_trajecten.tsv`).
+
 ## Trajectdata bijwerken (automatisch)
 
 ```
