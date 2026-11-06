@@ -40,6 +40,7 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
     private var candidateLevel: Level? = null
     private var candidateSince = 0.0
     private var lastRedReminder = 0.0
+    private var statusSegId: Long? = null
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
@@ -79,18 +80,15 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
                 say("Over $d meter trajectcontrole, ${e.segment.maxSpeed}.")
             }
             is EngineEvent.Start -> {
-                announcedLevel = Level.GREEN; candidateLevel = null
                 if (settings.speakStart) {
                     val extra = if (e.estimated) ", begin geschat" else ""
                     say("Trajectcontrole, ${km(e.segment.poly.length)} kilometer, ${e.segment.maxSpeed}$extra.")
                 }
             }
             is EngineEvent.End -> {
-                announcedLevel = null
                 if (settings.speakEnd) say("Traject afgesloten. Gemiddeld ${e.avgKmh.roundToInt()}.")
             }
             is EngineEvent.Left -> {
-                announcedLevel = null
                 if (settings.speakEnd) say("Trajectcontrole verlaten.")
             }
         }
@@ -98,7 +96,12 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
 
     /** Aanroepen bij elke status-update (t in seconden, monotone klok). */
     fun onStatus(s: Status?, t: Double) {
-        if (s == null || !settings.speakTooFast) return
+        if (s == null) { statusSegId = null; return }
+        if (s.segmentId != statusSegId) {
+            // ander (strenger) traject wordt getoond: groen niet opnieuw melden, oranje/rood wel
+            statusSegId = s.segmentId; announcedLevel = Level.GREEN; candidateLevel = null
+        }
+        if (!settings.speakTooFast) return
         // pas na ~10 s in het traject niveaus melden: het gemiddelde is in het begin onrustig
         if (s.lengthM - s.remainingM < 150) return
         if (s.level != candidateLevel) { candidateLevel = s.level; candidateSince = t }

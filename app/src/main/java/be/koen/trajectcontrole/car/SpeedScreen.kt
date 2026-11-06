@@ -75,7 +75,8 @@ class SpeedScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
             val color = when (st.level) { Level.GREEN -> CarColor.GREEN; Level.ORANGE -> CarColor.YELLOW; Level.RED -> CarColor.RED }
             pane.addRow(Row.Builder()
                 .setTitle("Gemiddeld ${st.avgKmh.roundToInt()} km/u")
-                .addText("limiet ${st.limit} · boete vanaf ${Math.ceil(st.threshold).toInt()}" + if (st.estimated) " · begin geschat" else "")
+                .addText("limiet ${st.limit} · boete vanaf ${Math.ceil(st.threshold).toInt()}" +
+                    (if (st.estimated) " · begin geschat" else "") + (if (st.parallel > 0) " · strengste van ${st.parallel + 1}" else ""))
                 .setImage(dot(color), Row.IMAGE_TYPE_ICON)
                 .build())
             pane.addRow(Row.Builder()

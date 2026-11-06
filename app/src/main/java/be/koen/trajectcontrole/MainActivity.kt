@@ -103,7 +103,8 @@ class MainActivity : Activity() {
             detail.text = "${s.segmentCount} trajecten geladen"
             return
         }
-        title.text = st.name + if (st.estimated) " (begin geschat)" else ""
+        title.text = st.name + (if (st.estimated) " (begin geschat)" else "") +
+            (if (st.parallel > 0) " · +${st.parallel} overlappend" else "")
         avg.text = st.avgKmh.roundToInt().toString()
         avg.setTextColor(when (st.level) { Level.GREEN -> Color.rgb(60, 200, 90); Level.ORANGE -> Color.rgb(255, 170, 0); Level.RED -> Color.rgb(230, 50, 50) })
         val nl = Locale("nl", "BE")

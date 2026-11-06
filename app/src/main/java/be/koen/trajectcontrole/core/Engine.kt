@@ -2,7 +2,7 @@ package be.koen.trajectcontrole.core
 
 /*
  * Rekenmotor voor gemiddelde snelheid in trajectcontroles.
- * 1-op-1 omzetting van engine.py (referentie, getest met gesimuleerde ritten).
+ * Oorspronkelijk omgezet uit engine.py; overlappende trajecten (punt 4) bestaan alleen hier.
  *
  * Principes:
  *  1. Voortdurend map-matchen op de trajectlijn i.p.v. een start-trigger.
@@ -10,6 +10,8 @@ package be.koen.trajectcontrole.core
  *     echte instaptijd teruggezocht (regressie rond voortgang 0).
  *  3. Aaneensluitende trajecten worden expliciet gekoppeld: het volgende traject
  *     start exact op het uittijdstip van het vorige.
+ *  4. Overlappende trajecten (bv. federaal binnen een Vlaams traject) worden tegelijk
+ *     gevolgd; de status toont het strengste: de laagste toegelaten snelheid voor de rest.
  *
  * Pure Kotlin, geen Android-afhankelijkheden -> testbaar op de JVM.
  */
@@ -43,7 +45,8 @@ data class Status(
     val maxRestKmh: Double,       // max. snelheid voor de rest om op de limiet uit te komen (0 = niet meer haalbaar)
     val remainingM: Double, val lengthM: Double,
     val estimated: Boolean,       // instaptijd geschat (historiek reikte niet tot het begin)
-    val level: Level
+    val level: Level,
+    val parallel: Int = 0         // aantal andere trajecten die tegelijk gevolgd worden
 )
 
 sealed class EngineEvent {
@@ -79,6 +82,7 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         const val APPROACH_M = 450.0    // naderingsmelding vanaf ~400 m voor het begin
         const val APPROACH_DIST = 25.0  // m naast de (verlengde) trajectlijn
         const val APPROACH_REPEAT_S = 600.0
+        const val SWITCH_MARGIN = 1.0   // km/u: getoond traject wisselt pas bij duidelijk strenger alternatief
     }
 
     private val segs: Map<Long, Segment> = segments.associateBy { it.id }
@@ -90,7 +94,8 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         val hist: MutableList<Pair<Double, Double>> = mutableListOf()
     )
 
-    private var active: Active? = null
+    private val active = LinkedHashMap<Long, Active>()
+    private var shownId: Long? = null
     private val approached = HashMap<Long, Double>()   // segment-id -> tijdstip laatste naderingsmelding
     val results = mutableListOf<EngineEvent.End>()
 
@@ -98,13 +103,27 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         buf.addLast(f)
         while (buf.isNotEmpty() && f.t - buf.first().t > BUFFER_S) buf.removeFirst()
         if (f.accuracy > MAX_ACC) return status(f.t)
-        if (active != null) updateActive(f)
-        if (active == null) tryMatch(f)
+        for (a in active.values.toList()) updateActive(a, f)
+        tryMatch(f)
         return status(f.t)
     }
 
+    /** Ids van alle trajecten die nu gevolgd worden. */
+    val activeIds: Set<Long> get() = active.keys.toSet()
+
+    /** Status van het strengste actieve traject (laagste max. snelheid voor de rest), met hysterese. */
     fun status(t: Double): Status? {
-        val a = active ?: return null
+        val all = active.values.mapNotNull { statusOf(it, t) }
+        if (all.isEmpty()) { shownId = null; return null }
+        fun key(s: Status) = s.maxRestKmh - (if (s.maxRestKmh <= 0.0) s.avgKmh - s.threshold else 0.0)
+        val best = all.minWith(compareBy<Status> { key(it) }.thenBy { it.limit }.thenByDescending { it.remainingM })
+        val cur = all.firstOrNull { it.segmentId == shownId }
+        val pick = if (cur != null && key(cur) <= key(best) + SWITCH_MARGIN) cur else best
+        shownId = pick.segmentId
+        return pick.copy(parallel = all.size - 1)
+    }
+
+    private fun statusOf(a: Active, t: Double): Status? {
         val s = a.seg
         val len = s.poly.length
         val el = t - a.tEntry
@@ -141,6 +160,7 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         if (f.speed < 2.0) return   // zonder betrouwbare rijrichting nooit matchen (tegenoverliggende rijbaan!)
         var approach: Pair<Segment, Double>? = null
         for (s in segs.values) {
+            if (s.id in active) continue
             if (!s.poly.nearBox(f.lat, f.lon, 0.006)) continue
             val pr = s.poly.project(f.lat, f.lon)
             if (angDiff(hd, pr.heading) > MAX_HEADING_DIFF) continue
@@ -152,9 +172,11 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
             if (pr.distance > MATCH_DIST || pr.progress < 0 || pr.progress > s.poly.length) continue
             val (tEntry, est) = backfillEntry(s, f)
             activate(s, tEntry, pr.progress, est)
-            return
         }
         approach?.let { (s, d) ->
+            // binnen een traject alleen een strenger traject verderop aankondigen; nooit een gekoppeld vervolg
+            if (active.values.any { s.id in it.seg.nextIds }) return
+            if (active.isNotEmpty() && active.values.all { it.seg.maxSpeed <= s.maxSpeed }) return
             val last = approached[s.id]
             if (d >= 30 && (last == null || f.t - last > APPROACH_REPEAT_S)) {
                 approached[s.id] = f.t
@@ -186,20 +208,19 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
     }
 
     private fun activate(s: Segment, tEntry: Double, prog: Double, est: Boolean) {
-        active = Active(s, tEntry, maxOf(0.0, prog), est)
+        active[s.id] = Active(s, tEntry, maxOf(0.0, prog), est)
         onEvent(EngineEvent.Start(s, tEntry, est))
     }
 
-    private fun updateActive(f: Fix) {
-        val a = active ?: return
+    private fun updateActive(a: Active, f: Fix) {
         val s = a.seg
         val len = s.poly.length
         val pr = s.poly.project(f.lat, f.lon)
         if (pr.distance > LEAVE_DIST) {
             if (a.offSince == null) a.offSince = f.t
             if (f.t - a.offSince!! > LEAVE_TIME) {
+                active.remove(s.id)
                 onEvent(EngineEvent.Left(s))
-                active = null
             }
             return
         }
@@ -218,16 +239,17 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
             val avg = len / (tExit - a.tEntry) * 3.6
             val end = EngineEvent.End(s, avg, a.tEntry, tExit, a.estimated)
             results.add(end)
+            active.remove(s.id)
             onEvent(end)
-            active = null
             // koppeling: volgend traject start exact op tExit
             for (nid in s.nextIds) {
+                if (nid in active) continue
                 val n = segs[nid] ?: continue
                 val pn = n.poly.project(f.lat, f.lon)
                 if (pn.distance <= MATCH_DIST && pn.progress >= -50) {
                     activate(n, tExit, pn.progress, a.estimated)
-                    active!!.tLast = f.t
-                    active!!.hist.add(f.t to pn.progress)
+                    active[n.id]!!.tLast = f.t
+                    active[n.id]!!.hist.add(f.t to pn.progress)
                     return
                 }
             }
