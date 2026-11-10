@@ -13,8 +13,8 @@ android {
         applicationId = "be.koen.trajectcontrole"
         minSdk = 29          // Android 10
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.5.0"
+        versionCode = 7
+        versionName = "0.5.1"
     }
 
     buildTypes {
@@ -37,5 +37,6 @@ kotlin {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.car.app:app:1.4.0")
+    implementation("androidx.car.app:app-projected:1.4.0")   // Android Auto (telefoonprojectie)
     testImplementation("junit:junit:4.13.2")
 }

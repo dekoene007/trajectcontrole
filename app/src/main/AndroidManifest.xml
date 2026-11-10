@@ -52,15 +52,16 @@
             android:foregroundServiceType="location" />
 
         <!-- Android Auto: eenvoudig scherm zonder kaart; botst niet met Waze-navigatie.
-             POI + IOT in EEN intent-filter: Android Auto (telefoonprojectie) toont een app met enkel IOT
-             niet in de launcher, en leest de categorieen enkel uit de eerste filter. -->
+             Enkel de POI-categorie: dat is de categorie die Android Auto op de telefoon het breedst
+             ondersteunt (IOT was in 0.4/0.5 extra gedeclareerd en kan de app laten weigeren). -->
         <service
             android:name=".car.SpeedCarAppService"
-            android:exported="true">
+            android:exported="true"
+            android:icon="@drawable/ic_launcher"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.POI" />
-                <category android:name="androidx.car.app.category.IOT" />
             </intent-filter>
         </service>
 
