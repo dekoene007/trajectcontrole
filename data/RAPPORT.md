@@ -1,6 +1,6 @@
-# Trajectcontroles: update 2026-11-09
+# Trajectcontroles: update 2026-11-16
 
-Trajecten: 365 → **365** · nieuw 0 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611091137
+Trajecten: 365 → **365** · nieuw 0 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611161123
 
 ## Eigen trajecten (data/eigen_trajecten.tsv)
 
