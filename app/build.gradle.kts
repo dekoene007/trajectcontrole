@@ -13,8 +13,8 @@ android {
         applicationId = "be.koen.trajectcontrole"
         minSdk = 29          // Android 10
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.5.2"
+        versionCode = 9
+        versionName = "0.6.0"
     }
 
     buildTypes {

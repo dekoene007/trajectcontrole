@@ -39,8 +39,10 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
     private var announcedLevel: Level? = null
     private var candidateLevel: Level? = null
     private var candidateSince = 0.0
-    private var lastRedReminder = 0.0
     private var statusSegId: Long? = null
+    private var lastReminder = 0.0
+    private var saidHalf = false
+    private var saidLastKm = false
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
@@ -100,23 +102,47 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
         if (s.segmentId != statusSegId) {
             // ander (strenger) traject wordt getoond: groen niet opnieuw melden, oranje/rood wel
             statusSegId = s.segmentId; announcedLevel = Level.GREEN; candidateLevel = null
+            saidHalf = false; saidLastKm = false
         }
         if (!settings.speakTooFast) return
         // pas na ~10 s in het traject niveaus melden: het gemiddelde is in het begin onrustig
         if (s.lengthM - s.remainingM < 150) return
         if (s.level != candidateLevel) { candidateLevel = s.level; candidateSince = t }
+        val avg = s.avgKmh.roundToInt()
         if (t - candidateSince >= 3.0 && s.level != announcedLevel) {
-            announcedLevel = s.level
-            val avg = s.avgKmh.roundToInt()
+            announcedLevel = s.level; lastReminder = t
             when (s.level) {
                 Level.GREEN -> say("Weer onder de limiet. Gemiddeld $avg.")
-                Level.ORANGE -> say("Gemiddeld $avg. Maximaal ${s.maxRestKmh.roundToInt()} voor de rest.")
-                Level.RED -> { say("Te snel. Gemiddeld $avg."); lastRedReminder = t }
+                Level.ORANGE -> say("Gemiddeld $avg. ${maxText(s)}")
+                Level.RED -> say("Te snel. Gemiddeld $avg. ${maxText(s)}")
             }
-        } else if (announcedLevel == Level.RED && t - lastRedReminder > 45) {
-            lastRedReminder = t
-            val mr = s.maxRestKmh.roundToInt()
-            say(if (mr > 0) "Gemiddeld ${s.avgKmh.roundToInt()}. Maximaal $mr." else "Gemiddeld ${s.avgKmh.roundToInt()}.")
+            return
+        }
+        // herinnering zolang je boven de limiet zit: rood elke 45 s, oranje elke 60 s
+        val interval = when (announcedLevel) { Level.RED -> 45.0; Level.ORANGE -> 60.0; else -> null }
+        if (interval != null && t - lastReminder > interval) {
+            lastReminder = t
+            say("Gemiddeld $avg. ${maxText(s)}"); return
+        }
+        // vaste meetpunten op langere trajecten, ook als alles in orde is
+        if (s.lengthM >= 3000) {
+            if (!saidHalf && s.remainingM <= s.lengthM / 2 && s.remainingM > 1500) {
+                saidHalf = true; lastReminder = t
+                say("Halfweg. Gemiddeld $avg. ${maxText(s)}")
+            } else if (!saidLastKm && s.remainingM <= 1000) {
+                saidLastKm = true; saidHalf = true; lastReminder = t
+                say("Nog 1 kilometer. Gemiddeld $avg. ${maxText(s)}")
+            }
+        }
+    }
+
+    /** Snelheid om net onder de boetedrempel te eindigen, als korte zin. */
+    private fun maxText(s: Status): String {
+        val z = s.maxRestThrKmh.roundToInt()
+        return when {
+            z <= 0 -> "Boetegrens niet meer haalbaar."
+            z > s.limit * 1.5 -> ""                       // geen zinvolle beperking
+            else -> "Maximaal $z tot het einde."
         }
     }
 

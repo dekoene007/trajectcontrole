@@ -109,7 +109,7 @@ class MainActivity : Activity() {
         avg.setTextColor(when (st.level) { Level.GREEN -> Color.rgb(60, 200, 90); Level.ORANGE -> Color.rgb(255, 170, 0); Level.RED -> Color.rgb(230, 50, 50) })
         val nl = Locale("nl", "BE")
         detail.text = "limiet ${st.limit} · boete vanaf ${"%.0f".format(nl, Math.ceil(st.threshold))}\n" +
-            "max. rest ${st.maxRestKmh.roundToInt()} · nog ${"%.1f".format(nl, st.remainingM / 1000)} km"
+            "max. ${st.maxRestThrKmh.roundToInt()} tot einde (boetegrens), ${st.maxRestKmh.roundToInt()} (limiet) · nog ${"%.1f".format(nl, st.remainingM / 1000)} km"
         detail.visibility = View.VISIBLE
     }
 }

@@ -80,7 +80,7 @@ class SpeedScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
                 .setImage(dot(color), Row.IMAGE_TYPE_ICON)
                 .build())
             pane.addRow(Row.Builder()
-                .setTitle(if (st.maxRestKmh > 0) "Max. ${st.maxRestKmh.roundToInt()} km/u voor de rest" else "Limiet niet meer haalbaar")
+                .setTitle(if (st.maxRestThrKmh > 0) "Max. ${st.maxRestThrKmh.roundToInt()} km/u tot einde (boetegrens)" else "Boetegrens niet meer haalbaar")
                 .addText("nog ${"%.1f".format(nl, st.remainingM / 1000)} km van ${"%.1f".format(nl, st.lengthM / 1000)} km")
                 .build())
             pane.addAction(Action.Builder().setTitle("Stoppen").setOnClickListener { TrackingService.stop(carContext) }.build())

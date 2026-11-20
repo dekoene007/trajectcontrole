@@ -46,7 +46,8 @@ data class Status(
     val remainingM: Double, val lengthM: Double,
     val estimated: Boolean,       // instaptijd geschat (historiek reikte niet tot het begin)
     val level: Level,
-    val parallel: Int = 0         // aantal andere trajecten die tegelijk gevolgd worden
+    val parallel: Int = 0,
+    val maxRestThrKmh: Double = 0.0  // max. snelheid voor de rest om net onder de boetedrempel te eindigen (0 = niet meer haalbaar)         // aantal andere trajecten die tegelijk gevolgd worden
 )
 
 sealed class EngineEvent {
@@ -133,12 +134,15 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         val remTimeAtLimit = len / (s.maxSpeed / 3.6) - el
         val rest = len - a.progress
         val maxRest = if (remTimeAtLimit > 0) rest / remTimeAtLimit * 3.6 else 0.0
+        val remTimeAtThr = len / (thr / 3.6) - el
+        val maxRestThr = if (remTimeAtThr > 0) rest / remTimeAtThr * 3.6 else 0.0
         val level = when {
             avg <= s.maxSpeed -> Level.GREEN
             avg <= thr -> Level.ORANGE
             else -> Level.RED
         }
-        return Status(s.id, s.name, s.maxSpeed, thr, avg, maxRest, rest, len, a.estimated, level)
+        return Status(s.id, s.name, s.maxSpeed, thr, avg, maxRest, rest, len, a.estimated, level,
+            maxRestThrKmh = maxRestThr)
     }
 
     // ---------------- intern ----------------
