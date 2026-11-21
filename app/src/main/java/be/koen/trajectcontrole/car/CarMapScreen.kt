@@ -18,7 +18,6 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.car.app.navigation.model.MapController
 import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -41,7 +40,7 @@ class CarMapScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
     private val handler = Handler(Looper.getMainLooper())
     private var lastInvalidate = 0L
     private var scheduled = false
-    private val renderer = CarMapRenderer(ctx) { markNow() }
+    private val renderer = CarLiveMap(ctx)
     private val listener: (StatusBus.State) -> Unit = { renderer.render(); requestRefresh() }
 
     init { lifecycle.addObserver(this) }
@@ -80,29 +79,24 @@ class CarMapScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
             pane.addRow(Row.Builder().setTitle("GPS ${s.gpsKmh.roundToInt()} km/u").addText("${s.segmentCount} trajecten geladen").build())
             s.lastResult?.let { pane.addRow(Row.Builder().setTitle("Laatste traject").addText(it).build()) }
         } else {
+            // meter, tegels en voortgang tekent de app zelf onder dit kaartje (Android Auto toont hier geen afbeelding)
             title = st.name
-            pane.setImage(CarIcon.Builder(IconCompat.createWithBitmap(DialRenderer.panelBitmap(st))).build())
-            // meter, tegels en voortgang zitten in de afbeelding; daaronder enkel het aansluitende traject
-            pane.addRow(st.nextName?.let { Row.Builder().setTitle("Aansluitend: $it").addText(DialRenderer.km(st.nextLengthM)).build() }
-                ?: Row.Builder().setTitle(if (st.maxRestThrKmh > 0) "Max. ${st.maxRestThrKmh.roundToInt()} km/u tot einde" else "Boetegrens niet meer haalbaar")
-                    .addText("Limiet ${st.limit}${if (st.limitOverridden) " (aangepast)" else ""} · boete vanaf ${Math.ceil(st.threshold).toInt()}").build())
+            pane.addRow(Row.Builder().setTitle("nog ${DialRenderer.km(st.remainingM)} van ${DialRenderer.km(st.lengthM)}").build())
         }
         val content = PaneTemplate.Builder(pane.build()).setTitle(title).setHeaderAction(Action.APP_ICON).build()
 
+        // één markeerknop (breed, met tekst) in de knoppenbalk van Android Auto; daarnaast Limiet of Starten/Stoppen
         val strip = ActionStrip.Builder()
+        strip.addAction(Action.Builder().setIcon(icon(R.drawable.ic_plus)).setTitle("Markeer").setOnClickListener { markNow() }.build())
         if (st != null) strip.addAction(Action.Builder().setTitle("Limiet").setOnClickListener {
             screenManager.push(LimitOverrideScreen(carContext))
         }.build())
         else if (s.running) strip.addAction(Action.Builder().setTitle("Stoppen").setOnClickListener { TrackingService.stop(carContext) }.build())
         else strip.addAction(Action.Builder().setTitle("Starten").setOnClickListener { startTracking() }.build())
 
-        val mapStrip = ActionStrip.Builder().addAction(
-            Action.Builder().setIcon(icon(R.drawable.ic_plus)).setOnClickListener { markNow() }.build()).build()
-
         return MapWithContentTemplate.Builder()
             .setContentTemplate(content)
             .setActionStrip(strip.build())
-            .setMapController(MapController.Builder().setMapActionStrip(mapStrip).build())
             .build()
     }
 

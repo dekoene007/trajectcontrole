@@ -46,4 +46,8 @@ class Settings(ctx: Context) {
     /** Gsm-scherm zonder statusbalk en navigatiebalk (veeg vanaf de rand om ze even te tonen). */
     var fullscreen: Boolean
         get() = p.getBoolean("fullscreen", false); set(v) = p.edit().putBoolean("fullscreen", v).apply()
+
+    /** "Maximaal … tot het einde" uitspreken (standaard uit: het gemiddelde volstaat). */
+    var speakMaxRest: Boolean
+        get() = p.getBoolean("speak_max_rest", false); set(v) = p.edit().putBoolean("speak_max_rest", v).apply()
 }

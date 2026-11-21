@@ -139,6 +139,7 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
 
     /** Snelheid om net onder de boetedrempel te eindigen, als korte zin. */
     private fun maxText(s: Status): String {
+        if (!settings.speakMaxRest) return ""
         val z = s.maxRestThrKmh.roundToInt()
         return when {
             z <= 0 -> "Boetegrens niet meer haalbaar."

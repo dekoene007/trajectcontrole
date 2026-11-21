@@ -207,7 +207,7 @@ class TrackingService : Service(), LocationListener {
         if (now - lastNotif > 2000) {
             lastNotif = now
             val text = if (st == null) "Geen trajectcontrole" else
-                "Gem. ${st.avgKmh.roundToInt()} / ${st.limit} · max ${st.maxRestThrKmh.roundToInt()} · nog ${"%.1f".format(Locale("nl", "BE"), st.remainingM / 1000)} km"
+                "Gem. ${st.avgKmh.roundToInt()} / ${st.limit} · nu ${(speed * 3.6).roundToInt()} · nog ${"%.1f".format(Locale("nl", "BE"), st.remainingM / 1000)} km"
             getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(text))
         }
     }

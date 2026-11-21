@@ -11,6 +11,7 @@ import android.view.View
 import be.koen.trajectcontrole.core.Level
 import be.koen.trajectcontrole.core.Status
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -98,27 +99,43 @@ object DialRenderer {
         c.drawText(km(st.lengthM), left + width, top + h + textSize * 1.4f, t)
     }
 
-    /** Afbeelding voor het paneel in Android Auto: meter, twee tegels, voortgangsbalk onderaan. */
-    fun panelBitmap(st: Status?, w: Int = 480, h: Int = 660): Bitmap {
-        val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(b)
-        val r = w * 0.38f
-        draw(c, w / 2f, r + w * 0.06f, r, st)
-        if (st == null) return b
-        // tegels: max. tot einde en limiet · boete
-        val top = r * 2.25f + w * 0.06f; val th = w * 0.21f; val gap = w * 0.03f; val tw = (w - gap) / 2f
-        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD2 }
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = w * 0.045f; textAlign = Paint.Align.CENTER }
-        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = w * 0.085f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
+    /**
+     * Volledig paneel (Android Auto): kaart-achtergrond, meter, tegels "Nu" (GPS) en "Limiet · boete",
+     * voortgangsbalk en aansluitend traject. Tekent binnen [r].
+     */
+    fun drawPanel(c: Canvas, r: RectF, st: Status, gpsKmh: Double) {
+        val w = r.width(); val pad = w * 0.06f
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD }
+        c.drawRoundRect(r, w * 0.07f, w * 0.07f, bg)
+        val inner = RectF(r.left + pad, r.top + pad, r.right - pad, r.bottom - pad)
+        val iw = inner.width()
+        // ruimte verdelen: meter boven, daaronder tegels, voortgang onderaan, aansluitend eronder
+        val nextH = if (st.nextName != null) iw * 0.09f else 0f
+        val progH = iw * 0.17f
+        val tileH = iw * 0.24f
+        val gap = iw * 0.04f
+        val dialSpace = inner.height() - nextH - progH - tileH - gap * 2
+        val rad = min(iw * 0.42f, dialSpace / 2.25f)
+        draw(c, inner.centerX(), inner.top + rad * 1.06f, rad, st)
+        val tTop = inner.top + rad * 2.25f + gap
+        val tw = (iw - gap) / 2f
+        val tb = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD2 }
+        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = iw * 0.05f; textAlign = Paint.Align.CENTER }
+        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = iw * 0.095f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
         fun tile(x: Float, label: String, value: String) {
-            c.drawRoundRect(RectF(x, top, x + tw, top + th), w * 0.035f, w * 0.035f, bg)
-            c.drawText(label, x + tw / 2, top + th * 0.36f, lab)
-            c.drawText(value, x + tw / 2, top + th * 0.82f, v)
+            c.drawRoundRect(RectF(x, tTop, x + tw, tTop + tileH), iw * 0.04f, iw * 0.04f, tb)
+            c.drawText(label, x + tw / 2, tTop + tileH * 0.38f, lab)
+            c.drawText(value, x + tw / 2, tTop + tileH * 0.82f, v)
         }
-        tile(0f, "Max. tot einde", if (st.maxRestThrKmh > 0) "${st.maxRestThrKmh.roundToInt()}" else "—")
-        tile(tw + gap, "Limiet · boete", "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
-        drawProgress(c, 0f, h - w * 0.13f, w.toFloat(), w * 0.028f, st, w * 0.045f)
-        return b
+        tile(inner.left, "Nu", "${gpsKmh.roundToInt()}")
+        tile(inner.left + tw + gap, "Limiet · boete", "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
+        drawProgress(c, inner.left, inner.bottom - nextH - progH, iw, iw * 0.035f, st, iw * 0.05f)
+        st.nextName?.let {
+            val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = iw * 0.05f }
+            var text = "Aansluitend: $it, ${km(st.nextLengthM)}"
+            while (t.measureText(text) > iw && text.length > 8) text = text.dropLast(2)
+            c.drawText(text, inner.left, inner.bottom - iw * 0.01f, t)
+        }
     }
 
     fun km(m: Double): String = if (m >= 10000) "${(m / 1000).roundToInt()} km" else String.format(java.util.Locale.GERMANY, "%.1f km", m / 1000)

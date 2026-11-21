@@ -58,6 +58,7 @@ class SettingsActivity : Activity() {
         header("Scherm")
         switch("Volledig scherm (zonder statusbalk)", s.fullscreen) { s.fullscreen = it }
         note("Verbergt de status- en navigatiebalk op het hoofdscherm. Veeg vanaf de boven- of onderrand om ze even te tonen. Het paneel blijft altijd onder de camera-uitsparing.")
+        note("Android Auto: " + (getSharedPreferences("aa", MODE_PRIVATE).getString("info", null) ?: "nog niet verbonden"))
 
         header("Overlay")
         switch("Toon overlay over andere apps", s.overlay) { on ->
@@ -84,6 +85,7 @@ class SettingsActivity : Activity() {
         switch("Bij begin van het traject", s.speakStart) { s.speakStart = it }
         switch("Bij einde van het traject", s.speakEnd) { s.speakEnd = it }
         switch("Bij te snel rijden (oranje/rood)", s.speakTooFast) { s.speakTooFast = it }
+        switch("Ook 'maximaal … tot het einde' uitspreken", s.speakMaxRest) { s.speakMaxRest = it }
 
         header("Markeren")
         note("Reactietijd: de markering wordt ${"%.1f".format(s.reactionSec)} s vóór je tik gelegd. Bij 120 km/u is dat ${(s.reactionSec * 33.3f).toInt()} m.")

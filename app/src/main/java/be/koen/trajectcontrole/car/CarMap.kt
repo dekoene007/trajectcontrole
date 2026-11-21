@@ -40,7 +40,7 @@ import kotlin.math.tan
  * gemaakt wordt als het traject of het zichtbare gebied verandert. Traject, voortgang en je positie worden
  * er elke seconde zelf overheen getekend. Zuinig en zonder verschuivende kaart tijdens het rijden.
  */
-class CarMapRenderer(private val ctx: CarContext, private val onMarkZone: () -> Unit) : SurfaceCallback {
+class CarMapRenderer(private val ctx: CarContext) : SurfaceCallback {
 
     private var container: SurfaceContainer? = null
     private var visible = Rect()
@@ -75,7 +75,6 @@ class CarMapRenderer(private val ctx: CarContext, private val onMarkZone: () -> 
     override fun onVisibleAreaChanged(r: Rect) { visible = Rect(r); camKey = null; render() }
     override fun onStableAreaChanged(r: Rect) {}
     override fun onSurfaceDestroyed(c: SurfaceContainer) { container = null; snapshotter?.cancel(); snapshotter = null }
-    override fun onClick(x: Float, y: Float) { if (zone().contains(x, y)) onMarkZone() }
 
     fun release() { snapshotter?.cancel(); snapshotter = null; snap = null }
 
@@ -153,7 +152,6 @@ class CarMapRenderer(private val ctx: CarContext, private val onMarkZone: () -> 
             val k = cam
             snap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
             if (k != null) drawOverlay(canvas, k, seg, s)
-            drawZone(canvas)
             drawAttribution(canvas)
         } finally {
             surface.unlockCanvasAndPost(canvas)

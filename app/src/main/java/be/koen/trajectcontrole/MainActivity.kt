@@ -27,7 +27,9 @@ import be.koen.trajectcontrole.core.Segment
 import be.koen.trajectcontrole.core.Status
 import be.koen.trajectcontrole.ui.DialRenderer
 import be.koen.trajectcontrole.ui.DialView
+import be.koen.trajectcontrole.ui.MapCamera
 import be.koen.trajectcontrole.ui.MapData
+import be.koen.trajectcontrole.ui.MapLayers
 import be.koen.trajectcontrole.ui.Theme
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -75,7 +77,6 @@ class MainActivity : Activity() {
 
     private lateinit var attributionView: TextView
     private var segs: Map<Long, Segment> = emptyMap()
-    private var drawnActive: Long? = Long.MIN_VALUE
     private var drawnVersion = -1
     private var userMovedAt = 0L
     private val listener: (StatusBus.State) -> Unit = { render(it) }
@@ -124,7 +125,7 @@ class MainActivity : Activity() {
             m.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) userMovedAt = SystemClock.elapsedRealtime()
             }
-            m.setStyle(Style.Builder().fromUri(MapData.STYLE_DARK)) { st -> style = st; addLayers(st); drawnVersion = -1; render(StatusBus.state) }
+            m.setStyle(Style.Builder().fromUri(MapData.STYLE_DARK)) { st -> style = st; layers = MapLayers(st); drawnVersion = -1; render(StatusBus.state) }
             m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(50.95, 4.2), 8.0))
         }
 
@@ -224,73 +225,31 @@ class MainActivity : Activity() {
 
     // ---------------- kaart ----------------
 
-    private fun addLayers(st: Style) {
-        fun src(id: String) = st.addSource(GeoJsonSource(id, MapData.EMPTY))
-        listOf("others", "starts", "ends", "both", "done", "rest", "aStart", "aEnd", "marks", "pos").forEach { src(it) }
-        // andere trajecten: volle lijn in lichtblauw-grijs, goed zichtbaar op de donkere kaart
-        st.addLayer(LineLayer("others", "others").withProperties(
-            PropertyFactory.lineColor(Theme.hex(Theme.TRACK)), PropertyFactory.lineWidth(4f),
-            PropertyFactory.lineCap(Property.LINE_CAP_ROUND), PropertyFactory.lineOpacity(0.9f)))
-        // begin (groen), einde (wit), tweerichting (grijs); pas vanaf zoom 10 om de kaart rustig te houden
-        fun dots(id: String, fill: Int) = st.addLayer(CircleLayer(id, id).withProperties(
-            PropertyFactory.circleRadius(5f), PropertyFactory.circleColor(Theme.hex(fill)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.BG)), PropertyFactory.circleStrokeWidth(2f)).apply { minZoom = 10f })
-        dots("starts", Theme.OK); dots("ends", Theme.TEXT); dots("both", Theme.TRACK)
-        st.addLayer(LineLayer("rest", "rest").withProperties(
-            PropertyFactory.lineColor(Theme.hex(Theme.ORANGE)), PropertyFactory.lineWidth(6f), PropertyFactory.lineOpacity(0.45f),
-            PropertyFactory.lineCap(Property.LINE_CAP_ROUND)))
-        st.addLayer(LineLayer("done", "done").withProperties(
-            PropertyFactory.lineColor(Theme.hex(Theme.ORANGE)), PropertyFactory.lineWidth(7f),
-            PropertyFactory.lineCap(Property.LINE_CAP_ROUND)))
-        st.addLayer(CircleLayer("aStart", "aStart").withProperties(
-            PropertyFactory.circleRadius(10f), PropertyFactory.circleColor(Theme.hex(Theme.BG)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.OK)), PropertyFactory.circleStrokeWidth(4f)))
-        st.addLayer(CircleLayer("aEnd", "aEnd").withProperties(
-            PropertyFactory.circleRadius(10f), PropertyFactory.circleColor(Theme.hex(Theme.TEXT)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.BG)), PropertyFactory.circleStrokeWidth(4f)))
-        st.addLayer(CircleLayer("marks", "marks").withProperties(
-            PropertyFactory.circleRadius(8f), PropertyFactory.circleColor(Theme.hex(Theme.BG)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.BLUE)), PropertyFactory.circleStrokeWidth(3f)))
-        st.addLayer(CircleLayer("pos", "pos").withProperties(
-            PropertyFactory.circleRadius(9f), PropertyFactory.circleColor(Theme.hex(Theme.BLUE)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.BG)), PropertyFactory.circleStrokeWidth(3f)))
-    }
-
-    private fun set(id: String, json: String) { style?.getSourceAs<GeoJsonSource>(id)?.setGeoJson(json) }
+    private var layers: MapLayers? = null
+    private var lastZoom = 15.0
+    private var lastCam = 0L
 
     private fun updateMap(s: StatusBus.State) {
         val m = map ?: return
-        if (style == null) return
-        val st = s.status
-        if (s.dataVersion != drawnVersion || segs.isEmpty()) {
+        val l = layers ?: return
+        val changed = s.dataVersion != drawnVersion || segs.isEmpty()
+        if (changed) {
             drawnVersion = s.dataVersion
             segs = (TrackingService.current?.engineSegments() ?: TrackingService.loadSegments(this)).associateBy { it.id }
-            drawnActive = Long.MIN_VALUE
-            set("marks", MapData.marks(MarkStore.all(this)))
         }
-        val seg = st?.let { segs[it.segmentId] }
-        if (st?.segmentId != drawnActive) {
-            set("others", MapData.others(segs.values, st?.segmentId))
-            val (sv, ev, bv) = MapData.endpoints(segs.values, st?.segmentId)
-            set("starts", sv); set("ends", ev); set("both", bv)
-            set("aStart", MapData.activeStart(seg)); set("aEnd", MapData.activeEnd(seg))
-            if (seg != null) fitSegment(m, seg)
-            drawnActive = st?.segmentId
-        }
-        set("done", MapData.activeDone(seg, st)); set("rest", MapData.activeRest(seg, st))
-        set("pos", MapData.position(s.lat, s.lon))
-        val free = SystemClock.elapsedRealtime() - userMovedAt > 20_000
-        if (seg == null && free && s.lat != null && s.lon != null)
-            m.easeCamera(CameraUpdateFactory.newLatLngZoom(LatLng(s.lat, s.lon), 13.0), 800)
-    }
-
-    /** Hele traject in beeld, tussen het paneel bovenaan en de knoppen onderaan. */
-    private fun fitSegment(m: MapLibreMap, seg: Segment) {
-        val b = LatLngBounds.Builder()
-        seg.poly.points.forEach { b.include(LatLng(it[0], it[1])) }
-        val bounds = try { b.build() } catch (_: Exception) { return }
-        val top = card.bottom + dpi(24f); val bot = (mapView.height - bottom.top) + dpi(32f)
-        m.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, dpi(40f), top, dpi(40f), bot), 800)
+        l.update(this, s, segs, changed)
+        val lat = s.lat ?: return; val lon = s.lon ?: return
+        if (SystemClock.elapsedRealtime() - userMovedAt < 20_000) return   // even niet volgen na zelf verschuiven
+        // positie centraal in het vrije deel tussen paneel en knoppen; hele traject in beeld
+        val area = android.graphics.RectF(0f, card.bottom.toFloat(), mapView.width.toFloat(), bottom.top.toFloat())
+        if (area.height() < 100 || area.width() < 100) return
+        val seg = s.status?.let { segs[it.segmentId] }
+        val density = resources.displayMetrics.density
+        val z = if (seg != null) MapCamera.zoomFor(lat, lon, seg.poly.points, area, density) else 15.0
+        if (Math.abs(z - lastZoom) > 0.15) lastZoom = z
+        val now = SystemClock.elapsedRealtime()
+        MapCamera.follow(m, lat, lon, lastZoom, area, mapView.width, mapView.height, density, if (now - lastCam > 3000) 0 else 1000)
+        lastCam = now
     }
 
     // ---------------- weergave ----------------
@@ -314,14 +273,11 @@ class MainActivity : Activity() {
             title.text = st.name + if (st.estimated) " (begin geschat)" else ""
             badge.text = if (st.parallel > 0) "+${st.parallel} overlap" else ""
             dial.status = st
-            maxTile.text = tileText("Max. tot einde", if (st.maxRestThrKmh > 0) "${st.maxRestThrKmh.roundToInt()}" else "—")
+            maxTile.text = tileText("Nu", "${s.gpsKmh.roundToInt()}")
             limTile.text = tileText("Limiet · boete" + if (st.limitOverridden) " (aangepast)" else "",
                 "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
             progress.status = st
-            info.text = listOfNotNull(
-                st.nextName?.let { "Aansluitend: $it, ${DialRenderer.km(st.nextLengthM)}" },
-                "GPS ${s.gpsKmh.roundToInt()} km/u"
-            ).joinToString(" · ")
+            info.text = st.nextName?.let { "Aansluitend: $it, ${DialRenderer.km(st.nextLengthM)}" } ?: ""
             limitBtn.isEnabled = true; limitBtn.alpha = 1f
         }
         updateMap(s)
