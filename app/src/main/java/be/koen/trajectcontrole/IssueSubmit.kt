@@ -19,7 +19,7 @@ object IssueSubmit {
         val g = m.geom ?: return@mapNotNull null
         val pts = SegmentStore.formatPoints(Track.simplify(SegmentStore.parsePoints(g), tolM))
         when (m.kind) {
-            MarkStore.EINDE -> "nieuw;id=${m.resultId};limiet=${m.limit ?: 50};naam=${(m.name ?: "Eigen traject").replace(';', ',')};punten=$pts"
+            MarkStore.EINDE -> "nieuw;id=${m.resultId};limiet=${m.limit ?: 50};beide=${if (m.both) 1 else 0};naam=${(m.name ?: "Eigen traject").replace(';', ',')};punten=$pts"
             MarkStore.CORR -> "correctie;id=${m.corrSeg};kant=${if (m.corrAtStart == true) "begin" else "einde"};naam=${(m.name ?: "").replace(';', ',')};punten=$pts"
             else -> null
         }

@@ -18,12 +18,19 @@ object MarkChoice {
             .setItems(labels.toTypedArray()) { _, i ->
                 when {
                     i == 0 -> { MarkStore.setBegin(a, m.id); toast(a, "Begin opgeslagen. Markeer opnieuw bij het einde."); onDone() }
-                    i == 1 -> chooseLimit(a) { lim -> MarkStore.setEinde(a, m.id, lim); report(a, m.id); onDone() }
+                    i == 1 -> chooseLimit(a) { lim -> chooseBoth(a) { both -> MarkStore.setEinde(a, m.id, lim); MarkStore.setBoth(a, m.id, both); report(a, m.id); onDone() } }
                     sug != null && i == 2 -> { MarkStore.setCorrectie(a, m.id, sug); report(a, m.id); onDone() }
                     else -> { toast(a, "Bewaard bij je markeringen."); onDone() }
                 }
             }
             .setOnCancelListener { onDone() }
+            .show()
+    }
+
+    fun chooseBoth(a: Activity, onPick: (Boolean) -> Unit) {
+        AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Rijrichting")
+            .setItems(arrayOf("Enkel deze richting", "Beide richtingen")) { _, i -> onPick(i == 1) }
             .show()
     }
 

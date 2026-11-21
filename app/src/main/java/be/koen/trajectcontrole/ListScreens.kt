@@ -88,7 +88,7 @@ class MarksActivity : DarkListActivity() {
         if (nieuw.isNotEmpty()) section("Nieuwe trajecten")
         nieuw.forEach { m ->
             val len = m.geom?.let { be.koen.trajectcontrole.core.Track.length(be.koen.trajectcontrole.core.SegmentStore.parsePoints(it)) }
-            row(m.name ?: "Eigen traject", "${MarkStore.fmt(m.pairId ?: m.id)} · ${len?.let { "%.1f km".format(Locale.GERMANY, it / 1000) } ?: "?"} · limiet ${m.limit}",
+            row(m.name ?: "Eigen traject", "${MarkStore.fmt(m.pairId ?: m.id)} · ${len?.let { "%.1f km".format(Locale.GERMANY, it / 1000) } ?: "?"} · limiet ${m.limit} · ${if (m.both) "beide richtingen" else "één richting"}",
                 stateLabel(m), stateColor(m)) { manage(m) }
         }
         if (corr.isNotEmpty()) section("Correcties")
@@ -123,7 +123,13 @@ class MarksActivity : DarkListActivity() {
     private fun stateColor(m: MarkStore.Mark) = when (stateLabel(m)) { "ACTIEF", "INGEDIEND" -> Theme.OK; "WACHT" -> Theme.ORANGE; else -> Theme.RED }
 
     private fun manage(m: MarkStore.Mark) {
-        dialog().setTitle(m.name ?: "Markering").setMessage(m.state.ifEmpty { "—" })
+        val d = dialog().setTitle(m.name ?: "Markering").setMessage(m.state.ifEmpty { "—" })
+        if (m.kind == MarkStore.EINDE)
+            d.setNeutralButton(if (m.both) "Enkel deze richting" else "Beide richtingen") { _, _ ->
+                MarkStore.setBoth(this, m.id, !m.both); build()
+                if (m.submitted) Toast.makeText(this, "Gewijzigd. Dien opnieuw in om de gedeelde data bij te werken.", Toast.LENGTH_LONG).show()
+            }
+        d
             .setPositiveButton("Verwijderen") { _, _ -> MarkStore.delete(this, m.id); TrackingService.current?.reloadSegments(); build() }
             .setNegativeButton("Sluiten", null).show()
     }
@@ -136,7 +142,7 @@ class MarksActivity : DarkListActivity() {
         dialog().setTitle(MarkStore.fmt(m.id)).setItems(labels.toTypedArray()) { _, i ->
             when {
                 i == 0 -> { MarkStore.setBegin(this, m.id); build() }
-                i == 1 -> MarkChoice.chooseLimit(this) { lim -> MarkStore.setEinde(this, m.id, lim); build() }
+                i == 1 -> MarkChoice.chooseLimit(this) { lim -> MarkChoice.chooseBoth(this) { both -> MarkStore.setEinde(this, m.id, lim); MarkStore.setBoth(this, m.id, both); build() } }
                 sug != null && i == 2 -> { MarkStore.setCorrectie(this, m.id, sug); build() }
                 else -> { MarkStore.delete(this, m.id); build() }
             }

@@ -42,7 +42,8 @@ object MarkStore {
         var resultId: Long? = null,   // id van het nieuwe of gecorrigeerde traject
         var name: String? = null,
         var state: String = "",       // actief | wacht | fout: …
-        var submitted: Boolean = false
+        var submitted: Boolean = false,
+        var both: Boolean = false     // nieuw traject geldt in beide richtingen
     )
 
     const val OPEN = "open"; const val BEGIN = "begin"; const val EINDE = "einde"; const val CORR = "correctie"
@@ -76,7 +77,7 @@ object MarkStore {
         m.limit?.let { put("limit", it) }; m.pairId?.let { put("pair", it) }
         m.corrSeg?.let { put("corrSeg", it) }; m.corrAtStart?.let { put("corrAtStart", it) }
         m.geom?.let { put("geom", it) }; m.resultId?.let { put("result", it) }; m.name?.let { put("name", it) }
-        put("state", m.state); put("submitted", m.submitted)
+        put("state", m.state); put("submitted", m.submitted); put("both", m.both)
     }
 
     private fun fromJson(o: JSONObject) = Mark(
@@ -86,8 +87,11 @@ object MarkStore {
         if (o.has("pair")) o.getLong("pair") else null, if (o.has("corrSeg")) o.getLong("corrSeg") else null,
         if (o.has("corrAtStart")) o.getBoolean("corrAtStart") else null,
         o.optString("geom").ifEmpty { null }, if (o.has("result")) o.getLong("result") else null,
-        o.optString("name").ifEmpty { null }, o.optString("state"), o.optBoolean("submitted")
+        o.optString("name").ifEmpty { null }, o.optString("state"), o.optBoolean("submitted"), o.optBoolean("both")
     )
+
+    /** Nieuw traject in één of beide richtingen. Na een wijziging opnieuw indienen (zelfde id = vervangen). */
+    fun setBoth(ctx: Context, id: Long, both: Boolean) = update(ctx, id) { m, _ -> m.both = both; m.submitted = false }
 
     // ---------------- vastleggen ----------------
 
@@ -213,7 +217,7 @@ object MarkStore {
             val g = m.geom ?: continue
             if (m.state != "actief") continue
             when (m.kind) {
-                EINDE -> own.append("${m.resultId}\t${(m.name ?: "Eigen traject").replace('\t', ' ')}\t${m.limit ?: 50}\t0\t\t$g\n")
+                EINDE -> own.append("${m.resultId}\t${(m.name ?: "Eigen traject").replace('\t', ' ')}\t${m.limit ?: 50}\t${if (m.both) 1 else 0}\t\t$g\n")
                 CORR -> corr.append("${m.corrSeg}\t$g\n")
             }
         }

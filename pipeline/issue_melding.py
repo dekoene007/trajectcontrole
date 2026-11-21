@@ -3,10 +3,10 @@
 
 Het issue bevat een blok
     ```trajectcontrole
-    nieuw;id=920123456;limiet=50;naam=Holsbeek, Dutselstraat;punten=lat,lon;lat,lon;...
+    nieuw;id=920123456;limiet=50;beide=1;naam=Holsbeek, Dutselstraat;punten=lat,lon;lat,lon;...
     correctie;id=815154;kant=begin;naam=...;punten=lat,lon;...
     ```
-- nieuw      -> data/eigen_trajecten.tsv (zelfde id = vervangen)
+- nieuw      -> data/eigen_trajecten.tsv (zelfde id = vervangen); beide=1 (of richting=beide) = in beide richtingen
 - correctie  -> data/correcties.tsv (nieuwe lijn voor dat traject-id; negatief id = één richting)
 
 Gebruik: ISSUE_BODY=... ISSUE_NR=12 python3 issue_melding.py <data-map>
@@ -74,10 +74,11 @@ def main():
                 lim = int(f.get('limiet', '0'))
                 if lim not in LIMITS: raise ValueError(f'ongeldige limiet {lim}')
                 if sid < 900_000_000: raise ValueError('id van een nieuw traject moet ≥ 900000000 zijn')
+                both = f.get('beide', '').lower() in ('1', 'ja', 'true') or f.get('richting', '').lower() == 'beide'
                 upsert(os.path.join(data, 'eigen_trajecten.tsv'), str(sid),
-                       f'{sid}\t{naam or "Eigen traject"} (melding #{nr})\t{lim}\t0\t\t{fmt(pts)}',
+                       f'{sid}\t{naam or "Eigen traject"} (melding #{nr})\t{lim}\t{1 if both else 0}\t\t{fmt(pts)}',
                        ['# Eigen trajectcontroles (zie README)'])
-                ok.append(f'nieuw traject **{naam}** ({sid}), limiet {lim}, {len(pts)} punten')
+                ok.append(f'nieuw traject **{naam}** ({sid}), limiet {lim}, {"beide richtingen" if both else "één richting"}, {len(pts)} punten')
             elif kind == 'correctie':
                 kant = f.get('kant', '?')
                 upsert(os.path.join(data, 'correcties.tsv'), str(sid), f'{sid}\t{fmt(pts)}\t{kant} via melding #{nr}',

@@ -38,7 +38,7 @@ jobs:
         run: |
           git config user.name "trajectcontrole-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/eigen_trajecten.tsv data/correcties.tsv
+          git add -A data/
           git diff --cached --quiet && { echo "geen wijzigingen"; exit 0; }
           git commit -m "Melding #${{ github.event.issue.number }} verwerkt"
           git push
