@@ -1,10 +1,22 @@
-# Trajectcontroles: update 2026-11-16
+# Trajectcontroles: update 2026-11-21
 
-Trajecten: 365 → **365** · nieuw 0 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611161123
+Trajecten: 365 → **371** · nieuw 6 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611211659
+
+## Nieuw
+
+| Traject | Naam | Limiet | Lengte |
+|---|---|---|---|
+| [22074469](https://www.openstreetmap.org/relation/22074469) | Traject 22074469 | 50 | 0.6 km |
+| [22074470](https://www.openstreetmap.org/relation/22074470) | Traject 22074470 | 50 | 0.6 km |
+| [22074471](https://www.openstreetmap.org/relation/22074471) | Traject 22074471 | 50 | 0.7 km |
+| [22074472](https://www.openstreetmap.org/relation/22074472) | Traject 22074472 | 50 | 0.7 km |
+| [22075715](https://www.openstreetmap.org/relation/22075715) | Trajectcontrole N33 Ichtegem (Centrum -Noord) | 70 | 1.5 km |
+| 977273904 (eigen) | Bierbeek, Koning Albertlaan (melding #11) | 30 | 0.8 km |
 
 ## Eigen trajecten (data/eigen_trajecten.tsv)
 
 - 900000001: Trajectcontrole Dutselstraat Holsbeek (eigen) (50 km/u, 1.48 km)
+- 977273904: Bierbeek, Koning Albertlaan (melding #11) (30 km/u, 0.75 km)
 
 ## AWV open data
 
@@ -45,6 +57,7 @@ Vervangen door AWV-portaalstukken (OSM voegde stukken samen of week af):
 | Trajectcontrole E40: Torhout-Nieuwpoort | 13.91 km | TC0175 A0180002 36->22.1; FEDPOL A0180002 22.1->7.3 |
 | Trajectcontrole E40: Torhout-Jabbeke | 11.83 km | TC0176 A0100002 93->92.5; TC0176 A0180001 36->46.5; TC0189 A0180001 22.1->36 |
 | Trajectcontrole E40: Loppem-Jabbeke | 8.12 km | FEDPOL A0100001 82.4->92.6 |
+| Trajectcontrole N33 Ichtegem (Noord - Centrum) | 1.48 km | TC0151 N0330001 13.6->15.4 |
 
 Overlapt met een bestaand traject maar met **andere lengte** (bestaande versie behouden — na te kijken):
 
@@ -62,6 +75,4 @@ Niet opgenomen:
 - TC0077 N0060001 6.6->7.5: lijn 1478 m past niet bij referentiepunten 900 m
 - TC0124 R0130001 0.5->9.4: lijn 2300 m past niet bij referentiepunten 8900 m
 - TC2021_339 N0080002 68->66: lijn 6780 m past niet bij referentiepunten 2000 m
-
-Geen wijzigingen.
 

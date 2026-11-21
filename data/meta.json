@@ -1,8 +1,8 @@
 {
- "laatst_gecontroleerd": "2026-11-16T11:23Z",
- "versie": 202611051926,
- "aantal": 365,
- "datum": "2026-11-05T19:28Z",
- "sha256": "8377a1580e28cae269c76cd29806771719bfdd0606c1509d71bc1c78abb09580",
- "osm_relaties": 177
+ "laatst_gecontroleerd": "2026-11-21T16:59Z",
+ "versie": 202611211659,
+ "aantal": 371,
+ "datum": "2026-11-21T16:59Z",
+ "sha256": "c0f6303baee748cb71cb41132371c2cdc124a19d9203fdf1321800c902a4c972",
+ "osm_relaties": 183
 }
