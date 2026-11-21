@@ -191,7 +191,7 @@ class CarMapRenderer(private val ctx: CarContext, private val onMarkZone: () -> 
         // andere trajecten in beeld
         val west = k.lon(k.cx - k.w / 2.0); val east = k.lon(k.cx + k.w / 2.0)
         val north = k.lat(k.cy - k.h / 2.0); val south = k.lat(k.cy + k.h / 2.0)
-        line.color = Theme.OTHER; line.strokeWidth = unit * 0.8f; line.alpha = 200
+        line.color = Theme.TRACK; line.strokeWidth = unit * 0.9f; line.alpha = 230
         for (o in segs.values) {
             if (o.id <= 0 || o.id == seg?.id) continue
             if (o.poly.maxLon < west || o.poly.minLon > east || o.poly.maxLat < south || o.poly.minLat > north) continue
