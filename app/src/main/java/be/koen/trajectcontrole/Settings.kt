@@ -18,7 +18,7 @@ class Settings(ctx: Context) {
         get() = p.getInt("bt_stop_delay", 30); set(v) = p.edit().putInt("bt_stop_delay", v).apply()
     /** Stoppen na 5 min stilstand, enkel als de app niet via Bluetooth gestart is (anders stopt hij in de file). */
     var autoStopIdle: Boolean
-        get() = p.getBoolean("auto_stop_idle", true); set(v) = p.edit().putBoolean("auto_stop_idle", v).apply()
+        get() = p.getBoolean("auto_stop_idle_v2", false); set(v) = p.edit().putBoolean("auto_stop_idle_v2", v).apply()
 
     // --- weergave ---
     var overlay: Boolean

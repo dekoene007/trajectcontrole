@@ -106,6 +106,21 @@ object DialRenderer {
      * Volledig paneel (Android Auto): kaart-achtergrond, meter, tegels "Nu" (GPS) en "Limiet · boete",
      * voortgangsbalk en aansluitend traject. Tekent binnen [r].
      */
+    /** Tekst over hoogstens [max] regels, op woordgrenzen; de laatste regel wordt zo nodig afgekort. */
+    fun wrap(p: Paint, text: String, w: Float, max: Int): List<String> {
+        val out = ArrayList<String>(); var cur = ""
+        val words = text.split(' ')
+        var i = 0
+        while (i < words.size) {
+            val t = if (cur.isEmpty()) words[i] else "$cur ${words[i]}"
+            if (p.measureText(t) <= w || cur.isEmpty()) { cur = t; i++ }
+            else { out.add(cur); cur = ""; if (out.size == max - 1) break }
+        }
+        val rest = (listOf(cur) + words.drop(i)).filter { it.isNotEmpty() }.joinToString(" ")
+        if (rest.isNotEmpty()) out.add(ellipsize(p, rest, w))
+        return out.take(max)
+    }
+
     private fun ellipsize(p: Paint, text: String, w: Float): String {
         if (p.measureText(text) <= w) return text
         var t = text
@@ -127,15 +142,16 @@ object DialRenderer {
             draw(c, inner.centerX(), inner.top + rad * 1.06f, rad, st)
             return
         }
-        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = iw * 0.075f; typeface = Typeface.DEFAULT_BOLD }
-        c.drawText(ellipsize(title, st.name.removePrefix("Trajectcontrole "), iw), inner.left, inner.top + title.textSize, title)
-        val titleH = title.textSize * 1.6f
+        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = iw * 0.072f; typeface = Typeface.DEFAULT_BOLD }
+        val lines = wrap(title, st.name.removePrefix("Trajectcontrole "), iw, 2)
+        lines.forEachIndexed { i, l -> c.drawText(l, inner.left, inner.top + title.textSize * (1f + i * 1.25f), title) }
+        val titleH = title.textSize * (1.25f * lines.size + 0.9f)   // ruimte tussen naam en meter
         val nextH = if (st.nextName != null) iw * 0.09f else 0f
         val progH = iw * 0.17f
         val tileH = iw * 0.24f
         val gap = iw * 0.04f
         val dialSpace = inner.height() - titleH - nextH - progH - tileH - gap * 2
-        val rad = min(iw * 0.42f, dialSpace / 2.25f)
+        val rad = min(iw * 0.36f, dialSpace / 2.25f)
         draw(c, inner.centerX(), inner.top + titleH + rad * 1.06f, rad, st)
         val tTop = inner.top + titleH + rad * 2.25f + gap
         val tw = (iw - gap) / 2f
@@ -164,6 +180,23 @@ object DialRenderer {
         val l = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = r.width() * 0.06f }
         c.drawText(ellipsize(t, title, r.width() - 2 * pad), r.left + pad, r.top + pad + t.textSize, t)
         c.drawText(ellipsize(l, line, r.width() - 2 * pad), r.left + pad, r.top + pad + t.textSize * 1.4f + l.textSize * 1.2f, l)
+    }
+
+    /** Tweede scherm (instrumentenpaneel): enkel de meter met daaronder limiet en resterende afstand. */
+    fun drawCluster(c: Canvas, r: RectF, s: be.koen.trajectcontrole.StatusBus.State) {
+        c.drawColor(Color.BLACK)
+        val st = s.status
+        val u = min(r.width(), r.height())
+        if (st == null) {
+            val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = u * 0.08f; textAlign = Paint.Align.CENTER }
+            c.drawText(if (s.running) "Geen trajectcontrole" else "Niet actief", r.centerX(), r.centerY(), t)
+            return
+        }
+        val rad = u * 0.34f
+        draw(c, r.centerX(), r.top + u * 0.06f + rad * 1.06f, rad, st)
+        val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = u * 0.075f; textAlign = Paint.Align.CENTER }
+        c.drawText("Limiet ${st.limit} · boete ${Math.ceil(st.threshold).toInt()} · nog ${km(st.remainingM)}",
+            r.centerX(), r.bottom - u * 0.06f, t)
     }
 
     fun km(m: Double): String = if (m >= 10000) "${(m / 1000).roundToInt()} km" else String.format(java.util.Locale.GERMANY, "%.1f km", m / 1000)

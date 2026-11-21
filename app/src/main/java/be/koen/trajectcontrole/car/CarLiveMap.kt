@@ -50,6 +50,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
     private var fallback: CarMapRenderer? = null
     private var container: SurfaceContainer? = null
     private var visible = Rect()
+    private var stable = Rect()
     private var segs: Map<Long, Segment> = emptyMap()
     private var segVersion = -1
     private var lastZoom = 15.0
@@ -98,7 +99,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
         saveArea(null)
         render(force = true)
     }
-    override fun onStableAreaChanged(r: Rect) { fallback?.onStableAreaChanged(r) }
+    override fun onStableAreaChanged(r: Rect) { stable = Rect(r); fallback?.onStableAreaChanged(r); saveArea(null); render(force = true) }
 
     override fun onSurfaceDestroyed(c: SurfaceContainer) {
         fallback?.onSurfaceDestroyed(c); fallback = null
@@ -118,31 +119,40 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
         val prefs = ctx.getSharedPreferences("aa", Context.MODE_PRIVATE)
         val old = prefs.getString("info", "") ?: ""
         val head = note ?: old.substringBefore(" | ")
-        prefs.edit().putString("info", "$head | scherm ${c.width}×${c.height}, vrij gebied $visible").apply()
+        prefs.edit().putString("info", "$head | scherm ${c.width}×${c.height}, vrij $visible, stabiel $stable").apply()
     }
 
     // ---------------- indeling ----------------
 
-    /** Klein kaartvak van het gesplitste scherm (of een klein autoscherm): enkel een compacte meter. */
-    private fun compact(w: Int, h: Int) = visible.height() < 430 || visible.width() < 560
+    /**
+     * Gebied voor de indeling. Android Auto toont en verbergt de knoppen rechtsboven bij een tik; het "vrije gebied"
+     * verandert dan mee. Het stabiele gebied verandert niet, dus het paneel springt niet meer.
+     */
+    private fun area(): Rect = if (!stable.isEmpty) stable else visible
 
-    /** Paneel links in het vrije gebied (ontwerp A); compact: kleine meter linksboven. */
+    /** Klein kaartvak van het gesplitste scherm (of een klein autoscherm): enkel een compacte meter. */
+    private fun compact(w: Int, h: Int) = h < 430 || area().width() < 560
+
+    /** Paneel links (ontwerp A), bovenaan op dezelfde hoogte als de knoppen van Android Auto. */
     private fun panelRect(w: Int, h: Int, active: Boolean): RectF {
-        val m = minOf(visible.width(), visible.height()) * 0.03f
+        val a = area()
+        val m = minOf(a.width(), h) * 0.03f
+        val top = m                                   // vaste bovenrand: niet meeschuiven met de knoppenbalk
         if (compact(w, h)) {
-            val size = visible.height() * 0.62f
-            return RectF(visible.left + m, visible.top + m, visible.left + m + size * 0.9f, visible.top + m + size)
+            val size = (h - 2 * m) * 0.9f
+            return RectF(a.left + m, top, a.left + m + size * 0.9f, top + size)
         }
-        val pw = minOf(visible.width() * 0.34f, visible.height() * 0.62f)
-        return if (active) RectF(visible.left + m, visible.top + m, visible.left + pw, visible.bottom - m)
-        else RectF(visible.left + m, visible.top + m, visible.left + pw, visible.top + m + pw * 0.42f)
+        val pw = minOf(a.width() * 0.34f, h * 0.62f)
+        return if (active) RectF(a.left + m, top, a.left + pw, a.bottom - m)
+        else RectF(a.left + m, top, a.left + pw, top + pw * 0.42f)
     }
 
     /** Vrij kaartgebied naast het paneel, waarin je positie gecentreerd wordt. */
     private fun mapArea(w: Int, h: Int, active: Boolean): RectF {
+        val a = area()
         val p = panelRect(w, h, active)
-        val left = if (active) p.right else visible.left.toFloat()
-        return RectF(left, visible.top.toFloat(), visible.right.toFloat(), visible.bottom.toFloat())
+        val left = if (active) p.right else a.left.toFloat()
+        return RectF(left, a.top.toFloat(), a.right.toFloat(), a.bottom.toFloat())
     }
 
     // ---------------- tekenen ----------------

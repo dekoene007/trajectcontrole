@@ -71,6 +71,8 @@
                 <!-- navigatiecategorie: zo kan de app, net als Flitsmeister en TollTracker, in het kaartvak van het
                      gesplitste scherm staan. De app start zelf nooit een route, dus Waze blijft navigeren. -->
                 <category android:name="androidx.car.app.category.NAVIGATION" />
+                <!-- tweede scherm (instrumentenpaneel) in auto's die dat aan navigatie-apps aanbieden -->
+                <category android:name="androidx.car.app.category.FEATURE_CLUSTER" />
             </intent-filter>
         </service>
 
