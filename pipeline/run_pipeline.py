@@ -211,6 +211,36 @@ def merge_eigen(tsv_path, eigen_path):
     return sorted(eigen)
 
 
+def apply_corrections(tsv_path, corr_path):
+    """Vervangt de lijn van bestaande trajecten (data/correcties.tsv, uit meldingen in de app).
+    Negatief id = enkel de omgekeerde richting van een tweerichtingstraject: dat traject wordt
+    eenrichting en de omgekeerde richting krijgt een eigen rij (id 930000000 + id). -> (toegepast, niet gevonden)"""
+    if not os.path.exists(corr_path): return [], []
+    corr = {}
+    for line in open(corr_path, encoding='utf-8'):
+        if line.startswith('#') or not line.strip(): continue
+        c = line.rstrip('\n').split('\t')
+        if len(c) >= 2 and c[0].lstrip('-').isdigit(): corr[int(c[0])] = c[1].strip()
+    lines = open(tsv_path, encoding='utf-8').readlines()
+    head, body = lines[0], [l.rstrip('\n').split('\t') for l in lines[1:] if l.strip()]
+    rows = {int(r[0]): r for r in body}
+    done, missing = [], []
+    for cid, pts in corr.items():
+        if cid > 0 and cid in rows:
+            rows[cid][5] = pts; done.append(cid)
+        elif cid < 0 and -cid in rows:
+            base = rows[-cid]; base[3] = '0'
+            nid = 930_000_000 + (-cid) % 70_000_000
+            rows[nid] = [str(nid), base[1] + ' (omgekeerd)', base[2], '0', '', pts]; done.append(cid)
+        else:
+            missing.append(cid)
+    import re
+    head = re.sub(r'aantal=\d+', f'aantal={len(rows)}', head)
+    open(tsv_path, 'w', encoding='utf-8').write(head + ''.join('\t'.join(r) + '\n' for r in rows.values()))
+    log(f'{len(done)} correctie(s) toegepast' + (f', {len(missing)} traject(en) niet gevonden: {missing}' if missing else ''))
+    return done, missing
+
+
 def eigen_in_osm(new, eigen_ids):
     """Eigen trajecten waarvan begin EN einde binnen 60 m van een OSM-traject liggen -> mogelijk dubbel."""
     def pts(line): return [tuple(map(float, p.split(','))) for p in line.split('\t')[5].strip().split(';')]
@@ -377,6 +407,7 @@ def main():
         awv = add_awv(new_tsv, work, a.awv_offline, os.path.join(data, 'segments.tsv'))
 
     # 4d: aaneensluitende trajecten koppelen over alle bronnen heen
+    corr_done, corr_missing = apply_corrections(new_tsv, os.path.join(data, 'correcties.tsv'))
     link_all(new_tsv)
 
     # 5: controles
@@ -401,6 +432,9 @@ def main():
     # 6: rapport + publiceren
     published = not checks
     text, changed = report(prev, new, checks, version, published, eigen, meldingen, awv)
+    if corr_done or corr_missing:
+        text += f"\n\n## Correcties uit meldingen\n\n- toegepast: {len(corr_done)}" + \
+            (f"\n- traject niet (meer) gevonden: {', '.join(map(str, corr_missing))} (bv. vervangen door AWV-data)" if corr_missing else '')
     open(os.path.join(data, 'RAPPORT.md'), 'w', encoding='utf-8').write(text + '\n')
     meta_p = os.path.join(data, 'meta.json')
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}

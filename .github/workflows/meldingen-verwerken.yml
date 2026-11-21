@@ -1,0 +1,59 @@
+name: Meldingen verwerken
+
+# Een issue met een blok ```trajectcontrole (aangemaakt vanuit de app via "Indienen") wordt
+# omgezet naar data/eigen_trajecten.tsv of data/correcties.tsv, waarna de wekelijkse update
+# meteen gestart wordt. Enkel issues van de eigenaar van de repository worden verwerkt.
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: meldingen
+  cancel-in-progress: false
+
+jobs:
+  verwerken:
+    if: github.event.issue.user.login == github.repository_owner && contains(github.event.issue.body, '```trajectcontrole')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Melding omzetten
+        id: m
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NR: ${{ github.event.issue.number }}
+        run: |
+          set +e
+          python3 pipeline/issue_melding.py data > samenvatting.md
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat samenvatting.md
+      - name: Vastleggen
+        if: steps.m.outputs.code == '0'
+        run: |
+          git config user.name "trajectcontrole-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/eigen_trajecten.tsv data/correcties.tsv
+          git diff --cached --quiet && { echo "geen wijzigingen"; exit 0; }
+          git commit -m "Melding #${{ github.event.issue.number }} verwerkt"
+          git push
+      - name: Antwoorden en update starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NR: ${{ github.event.issue.number }}
+          CODE: ${{ steps.m.outputs.code }}
+        run: |
+          if [ "$CODE" = "0" ]; then
+            printf '%s\n\nDe update wordt nu gestart; de app haalt de nieuwe data op bij de volgende controle (wifi).\n' "$(cat samenvatting.md)" > antwoord.md
+            gh issue comment "$NR" --body-file antwoord.md
+            gh issue close "$NR"
+            gh workflow run trajecten-bijwerken.yml --ref main
+          else
+            printf '%s\n\nNiets verwerkt. Pas het issue aan (de verwerking loopt opnieuw bij bewerken).\n' "$(cat samenvatting.md)" > antwoord.md
+            gh issue comment "$NR" --body-file antwoord.md
+          fi

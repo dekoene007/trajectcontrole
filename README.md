@@ -159,3 +159,26 @@ Bron trajecten: © OpenStreetMap-bijdragers (ODbL).
    - *Starten op basis van beweging* (zoals Flitsmeister) zit er niet in. Daarvoor zijn Google Play-services nodig, en met Bluetooth heb je het niet nodig.
 5. **De simulatie gebruikt willekeurige GPS-ruis.** Echte GPS wijkt vaak een tijd in dezelfde richting af en kaatst terug tegen gebouwen en vangrails. De echte rit is de eigenlijke validatie.
 6. **De melding bij nadering** werkt op rechte aanlopen, zoals snelwegen en de meeste gewestwegen. In een bocht vlak voor het begin kan ze wegvallen; het traject zelf wordt wel herkend.
+
+
+## App installeren zonder Android Studio
+
+Elke wijziging aan de app wordt in GitHub Actions gebouwd (workflow *App bouwen*). De nieuwste APK staat
+altijd bij de release **app-laatste** (Releases, rechts op de startpagina van de repository). Installeer ze op
+de gsm via **UnknownAuto**, zodat Android Auto de app aanvaardt. De APK is ondertekend met de vaste sleutel in
+`app/signing/` (enkel voor persoonlijk gebruik), dus een build uit Android Studio en een build uit Actions
+kunnen elkaar zonder verwijderen bijwerken.
+
+## Markeren en indienen
+
+Tik tijdens het rijden op **Markeer** (gsm of grote zone rechtsonder in Android Auto). De positie wordt
+vastgelegd op het moment van de tik, min de reactietijd (instelbaar, standaard 0,8 s). Daarna kies je:
+
+- **Begin** en later **Einde** (met limiet): een nieuw traject dat exact het gereden GPS-spoor volgt;
+- **Correctie**: het begin of einde van een bestaand traject in dezelfde rijrichting verschuiven;
+- **Later beslissen**: afwerken in *Markeringen*.
+
+Alles werkt meteen op het eigen toestel. Met **Indienen** opent een vooraf ingevuld GitHub-issue; de workflow
+*Meldingen verwerken* (enkel issues van de eigenaar) zet het om naar `data/eigen_trajecten.tsv` of
+`data/correcties.tsv` en start de update. Correcties op een traject dat later door AWV-data vervangen wordt,
+vervallen; het rapport meldt dat.
