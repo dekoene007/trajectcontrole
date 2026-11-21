@@ -13,8 +13,8 @@ android {
         applicationId = "be.koen.trajectcontrole"
         minSdk = 29          // Android 10
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.8.1"
+        versionCode = 16
+        versionName = "0.9.0"
         // enkel 64-bit ARM (alle recente gsm's, ook de S25): APK ±4x kleiner door de kaartbibliotheek
         ndk { abiFilters += "arm64-v8a" }
     }

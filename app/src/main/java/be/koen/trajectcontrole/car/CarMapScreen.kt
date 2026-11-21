@@ -18,7 +18,7 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.car.app.navigation.model.MapWithContentTemplate
+import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -65,39 +65,23 @@ class CarMapScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
 
     private fun icon(res: Int) = CarIcon.Builder(IconCompat.createWithResource(carContext, res)).build()
 
+    /**
+     * Navigatiesjabloon: enkel de kaart (door ons getekend, met paneel) en de knoppenbalk.
+     * Zo verschijnt de app ook in het kaartvak van het gesplitste scherm van Android Auto.
+     * Er wordt nooit een route gestart (NavigationManager blijft ongebruikt), dus Waze blijft navigeren.
+     */
     override fun onGetTemplate(): Template {
         val s = StatusBus.state
-        val st = s.status
-        val pane = Pane.Builder()
-        val title: String
-        if (!s.running) {
-            title = "Trajectcontrole"
-            pane.addRow(Row.Builder().setTitle("Niet actief").addText("Tik op Starten om trajectcontroles te volgen").build())
-            pane.addAction(Action.Builder().setTitle("Starten").setOnClickListener { startTracking() }.build())
-        } else if (st == null) {
-            // bovenste kaartje zo beknopt mogelijk: titel + één regel
-            title = if (s.gpsOk) "Geen trajectcontrole" else "Wacht op GPS…"
-            pane.addRow(Row.Builder().setTitle(s.lastResult?.let { "Laatste: $it" } ?: "GPS ${s.gpsKmh.roundToInt()} km/u").build())
-        } else {
-            // naam + limiet; meter, snelheid, voortgang en aansluitend traject staan in ons paneel eronder
-            title = st.name
-            pane.addRow(Row.Builder().setTitle("Limiet ${st.limit}${if (st.limitOverridden) " (aangepast)" else ""} · boete vanaf ${Math.ceil(st.threshold).toInt()}").build())
-        }
-        val content = PaneTemplate.Builder(pane.build()).setTitle(title).setHeaderAction(Action.APP_ICON).build()
-
-        // één markeerknop (breed, met tekst) in de knoppenbalk van Android Auto; daarnaast Limiet of Starten/Stoppen
         val strip = ActionStrip.Builder()
         strip.addAction(Action.Builder().setIcon(icon(R.drawable.ic_plus)).setTitle("Markeer").setOnClickListener { markNow() }.build())
-        if (st != null) strip.addAction(Action.Builder().setTitle("Limiet").setOnClickListener {
-            screenManager.push(LimitOverrideScreen(carContext))
-        }.build())
-        else if (s.running) strip.addAction(Action.Builder().setTitle("Stoppen").setOnClickListener { TrackingService.stop(carContext) }.build())
-        else strip.addAction(Action.Builder().setTitle("Starten").setOnClickListener { startTracking() }.build())
-
-        return MapWithContentTemplate.Builder()
-            .setContentTemplate(content)
-            .setActionStrip(strip.build())
-            .build()
+        when {
+            s.status != null -> strip.addAction(Action.Builder().setIcon(icon(R.drawable.ic_limit)).setOnClickListener {
+                screenManager.push(LimitOverrideScreen(carContext)) }.build())
+            s.running -> strip.addAction(Action.Builder().setIcon(icon(R.drawable.ic_stop)).setOnClickListener {
+                TrackingService.stop(carContext) }.build())
+            else -> strip.addAction(Action.Builder().setIcon(icon(R.drawable.ic_play)).setOnClickListener { startTracking() }.build())
+        }
+        return NavigationTemplate.Builder().setActionStrip(strip.build()).build()
     }
 
     private fun markNow() {

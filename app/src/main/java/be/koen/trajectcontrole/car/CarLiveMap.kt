@@ -123,22 +123,25 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
 
     // ---------------- indeling ----------------
 
-    /** Paneel: linkerkolom onder het kaartje van Android Auto (of links in het vrije gebied als er geen kolom is). */
-    private fun panelRect(w: Int, h: Int): RectF {
-        val m = h * 0.02f
-        return if (visible.left > w * 0.18f) {
-            // zelfde breedte en uitlijning als het kaartje van Android Auto erboven
-            RectF(m, h * 0.245f, visible.left - m, h - m)
-        } else {
-            val pw = visible.width() * 0.34f
-            RectF(visible.left + m, visible.top + m, visible.left + pw, visible.bottom - m)
+    /** Klein kaartvak van het gesplitste scherm (of een klein autoscherm): enkel een compacte meter. */
+    private fun compact(w: Int, h: Int) = visible.height() < 430 || visible.width() < 560
+
+    /** Paneel links in het vrije gebied (ontwerp A); compact: kleine meter linksboven. */
+    private fun panelRect(w: Int, h: Int, active: Boolean): RectF {
+        val m = minOf(visible.width(), visible.height()) * 0.03f
+        if (compact(w, h)) {
+            val size = visible.height() * 0.62f
+            return RectF(visible.left + m, visible.top + m, visible.left + m + size * 0.9f, visible.top + m + size)
         }
+        val pw = minOf(visible.width() * 0.34f, visible.height() * 0.62f)
+        return if (active) RectF(visible.left + m, visible.top + m, visible.left + pw, visible.bottom - m)
+        else RectF(visible.left + m, visible.top + m, visible.left + pw, visible.top + m + pw * 0.42f)
     }
 
-    /** Vrij kaartgebied (zonder paneel) waarin je positie gecentreerd wordt. */
-    private fun mapArea(w: Int, h: Int, withPanel: Boolean): RectF {
-        val p = panelRect(w, h)
-        val left = if (withPanel && visible.left <= w * 0.18f) p.right else visible.left.toFloat()
+    /** Vrij kaartgebied naast het paneel, waarin je positie gecentreerd wordt. */
+    private fun mapArea(w: Int, h: Int, active: Boolean): RectF {
+        val p = panelRect(w, h, active)
+        val left = if (active) p.right else visible.left.toFloat()
         return RectF(left, visible.top.toFloat(), visible.right.toFloat(), visible.bottom.toFloat())
     }
 
@@ -152,7 +155,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
             segVersion = s.dataVersion
             segs = (TrackingService.current?.engineSegments() ?: TrackingService.loadSegments(ctx)).associateBy { it.id }
         }
-        panel?.let { it.state = s; it.rect = panelRect(c.width, c.height); it.invalidate() }
+        panel?.let { it.state = s; it.rect = panelRect(c.width, c.height, s.status != null); it.compact = compact(c.width, c.height); it.invalidate() }
         val m = map ?: return
         layers?.update(ctx, s, segs, force)
         val lat = s.lat ?: return; val lon = s.lon ?: return
@@ -171,11 +174,16 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
     private class PanelView(ctx: Context) : View(ctx) {
         var state: StatusBus.State? = null
         var rect = RectF()
+        var compact = false
         override fun onDraw(canvas: Canvas) {
             val s = state ?: return
-            val st = s.status ?: return
-            if (rect.width() < 40 || rect.height() < 80) return
-            DialRenderer.drawPanel(canvas, rect, st, s.gpsKmh, height * 0.03f)
+            if (rect.width() < 40 || rect.height() < 40) return
+            val radius = minOf(width, height) * 0.03f
+            val st = s.status
+            if (st != null) DialRenderer.drawPanel(canvas, rect, st, s.gpsKmh, radius, compact)
+            else if (!compact) DialRenderer.drawIdle(canvas, rect,
+                when { !s.running -> "Niet actief"; s.gpsOk -> "Geen trajectcontrole"; else -> "Wacht op GPS…" },
+                s.lastResult?.let { "Laatste: $it" } ?: if (s.running) "GPS ${Math.round(s.gpsKmh)} km/u" else "Tik ▶ om te starten", radius)
         }
     }
 }
