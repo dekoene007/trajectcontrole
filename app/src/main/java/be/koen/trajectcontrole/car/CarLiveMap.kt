@@ -125,9 +125,10 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
 
     /** Paneel: linkerkolom onder het kaartje van Android Auto (of links in het vrije gebied als er geen kolom is). */
     private fun panelRect(w: Int, h: Int): RectF {
-        val m = h * 0.03f
+        val m = h * 0.02f
         return if (visible.left > w * 0.18f) {
-            RectF(m, h * 0.30f, visible.left - m, h - m)
+            // zelfde breedte en uitlijning als het kaartje van Android Auto erboven
+            RectF(m, h * 0.245f, visible.left - m, h - m)
         } else {
             val pw = visible.width() * 0.34f
             RectF(visible.left + m, visible.top + m, visible.left + pw, visible.bottom - m)
@@ -174,7 +175,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
             val s = state ?: return
             val st = s.status ?: return
             if (rect.width() < 40 || rect.height() < 80) return
-            DialRenderer.drawPanel(canvas, rect, st, s.gpsKmh)
+            DialRenderer.drawPanel(canvas, rect, st, s.gpsKmh, height * 0.03f)
         }
     }
 }

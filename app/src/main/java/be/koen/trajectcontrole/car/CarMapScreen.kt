@@ -75,13 +75,13 @@ class CarMapScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
             pane.addRow(Row.Builder().setTitle("Niet actief").addText("Tik op Starten om trajectcontroles te volgen").build())
             pane.addAction(Action.Builder().setTitle("Starten").setOnClickListener { startTracking() }.build())
         } else if (st == null) {
+            // bovenste kaartje zo beknopt mogelijk: titel + één regel
             title = if (s.gpsOk) "Geen trajectcontrole" else "Wacht op GPS…"
-            pane.addRow(Row.Builder().setTitle("GPS ${s.gpsKmh.roundToInt()} km/u").addText("${s.segmentCount} trajecten geladen").build())
-            s.lastResult?.let { pane.addRow(Row.Builder().setTitle("Laatste traject").addText(it).build()) }
+            pane.addRow(Row.Builder().setTitle(s.lastResult?.let { "Laatste: $it" } ?: "GPS ${s.gpsKmh.roundToInt()} km/u").build())
         } else {
-            // meter, tegels en voortgang tekent de app zelf onder dit kaartje (Android Auto toont hier geen afbeelding)
+            // naam + limiet; meter, snelheid, voortgang en aansluitend traject staan in ons paneel eronder
             title = st.name
-            pane.addRow(Row.Builder().setTitle("nog ${DialRenderer.km(st.remainingM)} van ${DialRenderer.km(st.lengthM)}").build())
+            pane.addRow(Row.Builder().setTitle("Limiet ${st.limit}${if (st.limitOverridden) " (aangepast)" else ""} · boete vanaf ${Math.ceil(st.threshold).toInt()}").build())
         }
         val content = PaneTemplate.Builder(pane.build()).setTitle(title).setHeaderAction(Action.APP_ICON).build()
 

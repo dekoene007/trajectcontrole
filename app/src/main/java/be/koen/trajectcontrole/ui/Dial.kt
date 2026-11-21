@@ -29,6 +29,9 @@ object Theme {
     val BLUE = Color.rgb(90, 169, 255)
     val OTHER = Color.rgb(107, 122, 144)
     val TRACK = Color.rgb(140, 170, 210)     // andere trajecten op de kaart
+    // zelfde tint als de kaartjes van Android Auto (neutraal donkergrijs)
+    val AA_CARD = Color.rgb(43, 46, 49)
+    val AA_TILE = Color.rgb(58, 62, 66)
 
     fun level(l: Level?) = when (l) { Level.GREEN -> OK; Level.ORANGE -> ORANGE; Level.RED -> RED; null -> MUTED }
     fun hex(c: Int) = String.format("#%06X", 0xFFFFFF and c)
@@ -90,7 +93,7 @@ object DialRenderer {
     fun drawProgress(c: Canvas, left: Float, top: Float, width: Float, h: Float, st: Status, textSize: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         val rr = h / 2
-        p.color = Theme.CARD2; c.drawRoundRect(RectF(left, top, left + width, top + h), rr, rr, p)
+        p.color = Theme.AA_TILE; c.drawRoundRect(RectF(left, top, left + width, top + h), rr, rr, p)
         val frac = (st.progressM / st.lengthM).coerceIn(0.0, 1.0).toFloat()
         if (frac > 0) { p.color = Theme.level(st.level); c.drawRoundRect(RectF(left, top, left + width * frac, top + h), rr, rr, p) }
         val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.textSize = textSize; color = Theme.MUTED }
@@ -103,32 +106,27 @@ object DialRenderer {
      * Volledig paneel (Android Auto): kaart-achtergrond, meter, tegels "Nu" (GPS) en "Limiet · boete",
      * voortgangsbalk en aansluitend traject. Tekent binnen [r].
      */
-    fun drawPanel(c: Canvas, r: RectF, st: Status, gpsKmh: Double) {
+    fun drawPanel(c: Canvas, r: RectF, st: Status, gpsKmh: Double, radius: Float) {
         val w = r.width(); val pad = w * 0.06f
-        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD }
-        c.drawRoundRect(r, w * 0.07f, w * 0.07f, bg)
+        c.drawRoundRect(r, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.AA_CARD })
         val inner = RectF(r.left + pad, r.top + pad, r.right - pad, r.bottom - pad)
         val iw = inner.width()
-        // ruimte verdelen: meter boven, daaronder tegels, voortgang onderaan, aansluitend eronder
+        // meter boven, daaronder "Nu", voortgang onderaan, eventueel aansluitend traject
         val nextH = if (st.nextName != null) iw * 0.09f else 0f
         val progH = iw * 0.17f
-        val tileH = iw * 0.24f
+        val tileH = iw * 0.22f
         val gap = iw * 0.04f
         val dialSpace = inner.height() - nextH - progH - tileH - gap * 2
         val rad = min(iw * 0.42f, dialSpace / 2.25f)
         draw(c, inner.centerX(), inner.top + rad * 1.06f, rad, st)
         val tTop = inner.top + rad * 2.25f + gap
-        val tw = (iw - gap) / 2f
-        val tb = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD2 }
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = iw * 0.05f; textAlign = Paint.Align.CENTER }
-        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = iw * 0.095f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
-        fun tile(x: Float, label: String, value: String) {
-            c.drawRoundRect(RectF(x, tTop, x + tw, tTop + tileH), iw * 0.04f, iw * 0.04f, tb)
-            c.drawText(label, x + tw / 2, tTop + tileH * 0.38f, lab)
-            c.drawText(value, x + tw / 2, tTop + tileH * 0.82f, v)
-        }
-        tile(inner.left, "Nu", "${gpsKmh.roundToInt()}")
-        tile(inner.left + tw + gap, "Limiet · boete", "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
+        val tile = RectF(inner.left, tTop, inner.right, tTop + tileH)
+        c.drawRoundRect(tile, radius * 0.6f, radius * 0.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.AA_TILE })
+        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = iw * 0.055f; textAlign = Paint.Align.RIGHT }
+        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = iw * 0.11f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.LEFT }
+        val base = tile.centerY() + v.textSize * 0.36f
+        c.drawText("Nu", tile.centerX() - iw * 0.03f, base, lab)
+        c.drawText("${gpsKmh.roundToInt()} km/u", tile.centerX() + iw * 0.02f, base, v)
         drawProgress(c, inner.left, inner.bottom - nextH - progH, iw, iw * 0.035f, st, iw * 0.05f)
         st.nextName?.let {
             val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = iw * 0.05f }

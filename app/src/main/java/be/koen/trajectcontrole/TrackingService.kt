@@ -172,7 +172,7 @@ class TrackingService : Service(), LocationListener {
                 PassageLog.add(this, PassageLog.Passage(System.currentTimeMillis(), e.segment.id, e.segment.name,
                     engine.limitOf(e.segment), e.avgKmh, e.segment.poly.length, e.estimated))
                 main.post { MarkStore.resolvePending(this); if (reloadPending) reloadSegments() }
-                val txt = "${e.segment.name}: gemiddeld %.1f km/u (limiet %d)".format(Locale("nl", "BE"), e.avgKmh, e.segment.maxSpeed)
+                val txt = "%.0f km/u op %s".format(Locale("nl", "BE"), e.avgKmh, e.segment.name.removePrefix("Trajectcontrole ").removeSuffix(" (eigen)"))
                 StatusBus.update { it.copy(lastResult = txt) }
             }
         }
