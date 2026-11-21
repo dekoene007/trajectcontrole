@@ -17,11 +17,22 @@ android {
         versionName = "0.6.0"
     }
 
+    // Vaste sleutel in de repository: een APK uit GitHub Actions en een build uit Android Studio
+    // zijn zo onderling uitwisselbaar (updaten zonder eerst te verwijderen). Enkel voor persoonlijk gebruik.
+    signingConfigs {
+        create("eigen") {
+            storeFile = file("signing/trajectcontrole.jks")
+            storePassword = "trajectcontrole"
+            keyAlias = "trajectcontrole"
+            keyPassword = "trajectcontrole"
+        }
+    }
+
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("eigen") }
         release {
             isMinifyEnabled = false
-            // Voor eigen gebruik: release ondertekenen met de debug-sleutel, zodat je zonder keystore kunt installeren.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("eigen")
         }
     }
     compileOptions {
