@@ -82,11 +82,10 @@ class CarMapScreen(ctx: CarContext) : Screen(ctx), DefaultLifecycleObserver {
         } else {
             title = st.name
             pane.setImage(CarIcon.Builder(IconCompat.createWithBitmap(DialRenderer.panelBitmap(st))).build())
-            pane.addRow(Row.Builder()
-                .setTitle(if (st.maxRestThrKmh > 0) "Max. ${st.maxRestThrKmh.roundToInt()} km/u tot einde" else "Boetegrens niet meer haalbaar")
-                .addText("Limiet ${st.limit}${if (st.limitOverridden) " (aangepast)" else ""} · boete vanaf ${Math.ceil(st.threshold).toInt()}")
-                .build())
-            st.nextName?.let { pane.addRow(Row.Builder().setTitle("Aansluitend").addText("$it, ${DialRenderer.km(st.nextLengthM)}").build()) }
+            // meter, tegels en voortgang zitten in de afbeelding; daaronder enkel het aansluitende traject
+            pane.addRow(st.nextName?.let { Row.Builder().setTitle("Aansluitend: $it").addText(DialRenderer.km(st.nextLengthM)).build() }
+                ?: Row.Builder().setTitle(if (st.maxRestThrKmh > 0) "Max. ${st.maxRestThrKmh.roundToInt()} km/u tot einde" else "Boetegrens niet meer haalbaar")
+                    .addText("Limiet ${st.limit}${if (st.limitOverridden) " (aangepast)" else ""} · boete vanaf ${Math.ceil(st.threshold).toInt()}").build())
         }
         val content = PaneTemplate.Builder(pane.build()).setTitle(title).setHeaderAction(Action.APP_ICON).build()
 

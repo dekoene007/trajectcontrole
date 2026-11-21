@@ -61,23 +61,6 @@ object DialRenderer {
             p.color = Theme.RED; dot(c, cx, cy, r, START + SWEEP, w / 2, p)
         }
 
-        // streepjes en getallen bij limiet en boetedrempel
-        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(74, 85, 102); strokeWidth = r * 0.015f }
-        var v = lo
-        while (v <= hi + 0.1f) {
-            val a = Math.toRadians(ang(v).toDouble())
-            c.drawLine(cx + (r - w * 0.9f) * cos(a).toFloat(), cy + (r - w * 0.9f) * sin(a).toFloat(),
-                cx + (r - w * 1.5f) * cos(a).toFloat(), cy + (r - w * 1.5f) * sin(a).toFloat(), tick)
-            v += 10f
-        }
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = r * 0.11f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
-        fun label(value: Float, text: String, color: Int) {
-            val a = Math.toRadians(ang(value).toDouble()); val rr = r - w * 2.4f
-            lab.color = color
-            c.drawText(text, cx + rr * cos(a).toFloat(), cy + rr * sin(a).toFloat() + lab.textSize / 3, lab)
-        }
-        if (st != null) { label(limit.toFloat(), "$limit", Theme.TEXT); label(thr, "${Math.ceil(thr.toDouble()).toInt()}", Theme.ORANGE) }
-
         // naald
         if (st != null) {
             val a = Math.toRadians(ang(st.avgKmh.toFloat()).toDouble())
@@ -114,13 +97,26 @@ object DialRenderer {
         c.drawText(km(st.lengthM), left + width, top + h + textSize * 1.4f, t)
     }
 
-    /** Afbeelding voor het paneel in Android Auto: meter met voortgangsbalk eronder. */
-    fun panelBitmap(st: Status?, w: Int = 480, h: Int = 520): Bitmap {
+    /** Afbeelding voor het paneel in Android Auto: meter, twee tegels, voortgangsbalk onderaan. */
+    fun panelBitmap(st: Status?, w: Int = 480, h: Int = 660): Bitmap {
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
-        val r = w * 0.40f
+        val r = w * 0.38f
         draw(c, w / 2f, r + w * 0.06f, r, st)
-        if (st != null) drawProgress(c, w * 0.04f, h - w * 0.15f, w * 0.92f, w * 0.03f, st, w * 0.05f)
+        if (st == null) return b
+        // tegels: max. tot einde en limiet · boete
+        val top = r * 2.25f + w * 0.06f; val th = w * 0.21f; val gap = w * 0.03f; val tw = (w - gap) / 2f
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD2 }
+        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = w * 0.045f }
+        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = w * 0.085f; typeface = Typeface.DEFAULT_BOLD }
+        fun tile(x: Float, label: String, value: String) {
+            c.drawRoundRect(RectF(x, top, x + tw, top + th), w * 0.035f, w * 0.035f, bg)
+            c.drawText(label, x + w * 0.035f, top + th * 0.36f, lab)
+            c.drawText(value, x + w * 0.035f, top + th * 0.82f, v)
+        }
+        tile(0f, "Max. tot einde", if (st.maxRestThrKmh > 0) "${st.maxRestThrKmh.roundToInt()}" else "—")
+        tile(tw + gap, "Limiet · boete", "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
+        drawProgress(c, 0f, h - w * 0.13f, w.toFloat(), w * 0.028f, st, w * 0.045f)
         return b
     }
 
