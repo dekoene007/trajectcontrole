@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write              # data/ terugschrijven
-  issues: write                # rapport als issue (geeft een e-mail)
+  issues: write                # rapport als issue bij een mislukte update (geeft een e-mail)
 
 concurrency:
   group: trajecten
@@ -44,15 +44,12 @@ jobs:
             git push
           fi
 
-      - name: Rapport als issue (bij wijziging of fout)
-        if: steps.pipe.outputs.changed == 'true' || steps.pipe.outputs.failed == 'true' || steps.pipe.outcome == 'failure'
+      - name: Rapport als issue (enkel bij fout)
+        # een geslaagde update staat in de commit en in data/RAPPORT.md; enkel een mislukte update geeft een issue (e-mail)
+        if: always() && (steps.pipe.outputs.failed == 'true' || steps.pipe.outcome == 'failure' || failure())
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ steps.pipe.outputs.failed }}" = "true" ] || [ "${{ steps.pipe.outcome }}" = "failure" ]; then
-            TITLE="Trajectcontroles: update NIET gepubliceerd ($(date -u +%Y-%m-%d))"
-          else
-            TITLE="Trajectcontroles bijgewerkt ($(date -u +%Y-%m-%d))"
-          fi
+          TITLE="Trajectcontroles: update NIET gepubliceerd ($(date -u +%Y-%m-%d))"
           if [ ! -s data/RAPPORT.md ]; then echo "Technische fout, zie de log van deze run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > data/RAPPORT.md; fi
           gh issue create --title "$TITLE" --body-file data/RAPPORT.md
