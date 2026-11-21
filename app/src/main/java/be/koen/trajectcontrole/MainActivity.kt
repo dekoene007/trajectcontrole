@@ -150,6 +150,7 @@ class MainActivity : Activity() {
         val tiles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun tile(): TextView = text(14f).apply {
             background = rounded(Theme.CARD2, 16f); setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
+            gravity = Gravity.CENTER
         }
         maxTile = tile(); limTile = tile()
         tiles.addView(maxTile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(8f) })
@@ -295,8 +296,9 @@ class MainActivity : Activity() {
             title.text = st.name + if (st.estimated) " (begin geschat)" else ""
             badge.text = if (st.parallel > 0) "+${st.parallel} overlap" else ""
             dial.status = st
-            maxTile.text = if (st.maxRestThrKmh > 0) "Max. tot einde\n${st.maxRestThrKmh.roundToInt()}" else "Max. tot einde\nboetegrens niet haalbaar"
-            limTile.text = "Limiet · boete\n${st.limit} · ${Math.ceil(st.threshold).toInt()}" + if (st.limitOverridden) " (aangepast)" else ""
+            maxTile.text = tileText("Max. tot einde", if (st.maxRestThrKmh > 0) "${st.maxRestThrKmh.roundToInt()}" else "—")
+            limTile.text = tileText("Limiet · boete" + if (st.limitOverridden) " (aangepast)" else "",
+                "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
             progress.status = st
             info.text = listOfNotNull(
                 st.nextName?.let { "Aansluitend: $it, ${DialRenderer.km(st.nextLengthM)}" },
@@ -305,6 +307,16 @@ class MainActivity : Activity() {
             limitBtn.isEnabled = true; limitBtn.alpha = 1f
         }
         updateMap(s)
+    }
+
+    /** Tegel: klein grijs label met daaronder een groot vet getal, beide gecentreerd. */
+    private fun tileText(label: String, value: String): CharSequence {
+        val sb = android.text.SpannableStringBuilder(label + "\n" + value)
+        val v0 = label.length + 1
+        sb.setSpan(android.text.style.ForegroundColorSpan(Theme.MUTED), 0, label.length, 0)
+        sb.setSpan(android.text.style.RelativeSizeSpan(1.9f), v0, sb.length, 0)
+        sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), v0, sb.length, 0)
+        return sb
     }
 
     private fun dataAge(): String {

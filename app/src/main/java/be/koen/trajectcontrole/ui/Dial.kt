@@ -107,12 +107,12 @@ object DialRenderer {
         // tegels: max. tot einde en limiet · boete
         val top = r * 2.25f + w * 0.06f; val th = w * 0.21f; val gap = w * 0.03f; val tw = (w - gap) / 2f
         val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.CARD2 }
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = w * 0.045f }
-        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = w * 0.085f; typeface = Typeface.DEFAULT_BOLD }
+        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.MUTED; textSize = w * 0.045f; textAlign = Paint.Align.CENTER }
+        val v = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Theme.TEXT; textSize = w * 0.085f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
         fun tile(x: Float, label: String, value: String) {
             c.drawRoundRect(RectF(x, top, x + tw, top + th), w * 0.035f, w * 0.035f, bg)
-            c.drawText(label, x + w * 0.035f, top + th * 0.36f, lab)
-            c.drawText(value, x + w * 0.035f, top + th * 0.82f, v)
+            c.drawText(label, x + tw / 2, top + th * 0.36f, lab)
+            c.drawText(value, x + tw / 2, top + th * 0.82f, v)
         }
         tile(0f, "Max. tot einde", if (st.maxRestThrKmh > 0) "${st.maxRestThrKmh.roundToInt()}" else "—")
         tile(tw + gap, "Limiet · boete", "${st.limit} · ${Math.ceil(st.threshold).toInt()}")
