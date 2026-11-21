@@ -13,7 +13,12 @@ object StatusBus {
         val status: Status? = null,          // null = niet in een traject
         val lastResult: String? = null,      // tekst van het laatst afgesloten traject
         val gpsOk: Boolean = false,
-        val segmentCount: Int = 0
+        val segmentCount: Int = 0,
+        val lat: Double? = null, val lon: Double? = null,   // laatste positie
+        val heading: Double? = null,
+        val gpsKmh: Double = 0.0,
+        val rideFile: String? = null,        // naam van het lopende ritlogboek
+        val dataVersion: Int = 0              // verhoogt als trajecten/markeringen wijzigen (kaart opnieuw tekenen)
     )
 
     @Volatile var state = State()

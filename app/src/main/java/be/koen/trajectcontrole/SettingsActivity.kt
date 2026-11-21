@@ -76,6 +76,15 @@ class SettingsActivity : Activity() {
         switch("Bij begin van het traject", s.speakStart) { s.speakStart = it }
         switch("Bij einde van het traject", s.speakEnd) { s.speakEnd = it }
         switch("Bij te snel rijden (oranje/rood)", s.speakTooFast) { s.speakTooFast = it }
+
+        header("Markeren")
+        note("Reactietijd: de markering wordt ${"%.1f".format(s.reactionSec)} s vóór je tik gelegd. Bij 120 km/u is dat ${(s.reactionSec * 33.3f).toInt()} m.")
+        for (v in listOf(0.0f, 0.5f, 0.8f, 1.2f, 1.5f)) {
+            button((if (v == s.reactionSec) "● " else "") + "%.1f s".format(v)) { s.reactionSec = v; build() }
+        }
+
+        header("GPS en je teller")
+        note("De app meet met GPS, net als een trajectcontrole de werkelijke snelheid meet. De teller van je auto wijst wettelijk nooit te weinig aan en meestal 3 à 6 km/u te veel. Toont de app 128 terwijl je teller 133 aangeeft, dan is dat normaal.")
     }
 
     @SuppressLint("MissingPermission")

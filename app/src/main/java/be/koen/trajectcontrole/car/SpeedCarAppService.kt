@@ -10,6 +10,8 @@ import androidx.car.app.validation.HostValidator
 class SpeedCarAppService : CarAppService() {
     override fun createHostValidator(): HostValidator = HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
     override fun onCreateSession(): Session = object : Session() {
-        override fun onCreateScreen(intent: Intent): Screen = SpeedScreen(carContext)
+        // kaartscherm vanaf Car API 7 (MapWithContentTemplate), anders het eenvoudige paneel
+        override fun onCreateScreen(intent: Intent): Screen =
+            if (carContext.carAppApiLevel >= 7) CarMapScreen(carContext) else SpeedScreen(carContext)
     }
 }

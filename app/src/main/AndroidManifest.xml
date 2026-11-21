@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Android Auto: kaart tekenen (MapWithContentTemplate) -->
+    <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <!-- overlay boven andere apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
@@ -31,6 +34,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".MarksActivity" android:exported="false" android:label="Markeringen" />
+        <activity android:name=".PassagesActivity" android:exported="false" android:label="Passages" />
 
         <activity
             android:name=".SettingsActivity"
@@ -51,7 +57,7 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Android Auto: eenvoudig scherm zonder kaart; botst niet met Waze-navigatie.
+        <!-- Android Auto: kaartscherm (Car API 7+) of eenvoudig paneel; botst niet met Waze-navigatie.
              Enkel de POI-categorie: dat is de categorie die Android Auto op de telefoon het breedst
              ondersteunt (IOT was in 0.4/0.5 extra gedeclareerd en kan de app laten weigeren). -->
         <service

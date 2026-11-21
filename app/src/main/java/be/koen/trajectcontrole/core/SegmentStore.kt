@@ -18,11 +18,46 @@ object SegmentStore {
         return out.values.toList()
     }
 
-    fun parse(base: Reader, overrides: Reader?): List<Segment> {
+    fun parse(base: Reader, overrides: Reader?): List<Segment> = parse(base, listOfNotNull(overrides), emptyList())
+
+    /**
+     * Basisdata, dan aanvullingen in hetzelfde formaat (zelfde id = vervangen),
+     * dan geometriecorrecties: regels "id \t lat,lon;lat,lon;..." die enkel de lijn van dat id vervangen
+     * (ook voor een negatief id = één richting van een tweerichtingstraject).
+     */
+    fun parse(base: Reader, extra: List<Reader>, geometry: List<Reader>): List<Segment> {
         val out = LinkedHashMap<Long, Segment>()
         merge(out, base)
-        if (overrides != null) merge(out, overrides)
+        extra.forEach { merge(out, it) }
+        geometry.forEach { applyGeometry(out, it) }
         return out.values.filter { it.maxSpeed > 0 }
+    }
+
+    fun parsePoints(text: String): List<DoubleArray> = text.split(';').mapNotNull { p ->
+        val ll = p.split(',')
+        if (ll.size != 2) null else {
+            val la = ll[0].trim().toDoubleOrNull(); val lo = ll[1].trim().toDoubleOrNull()
+            if (la == null || lo == null) null else doubleArrayOf(la, lo)
+        }
+    }
+
+    fun formatPoints(pts: List<DoubleArray>): String =
+        pts.joinToString(";") { "%.6f,%.6f".format(java.util.Locale.US, it[0], it[1]) }
+
+    private fun applyGeometry(out: MutableMap<Long, Segment>, reader: Reader) {
+        BufferedReader(reader).useLines { lines ->
+            for (raw in lines) {
+                val line = raw.trim()
+                if (line.isEmpty() || line.startsWith("#")) continue
+                val c = line.split('\t')
+                if (c.size < 2) continue
+                val id = c[0].trim().toLongOrNull() ?: continue
+                val old = out[id] ?: continue
+                val pts = parsePoints(c[1])
+                if (pts.size < 2) continue
+                out[id] = Segment(id, old.name, old.maxSpeed, Polyline(pts), old.nextIds)
+            }
+        }
     }
 
     private fun merge(out: MutableMap<Long, Segment>, reader: Reader) {

@@ -55,11 +55,20 @@ class TrackingService : Service(), LocationListener {
             ctx.stopService(Intent(ctx, TrackingService::class.java))
         }
 
-        /** Trajecten laden: nieuwste van meegeleverd/bijgewerkt + optioneel eigen correcties (files/correcties.tsv). */
+        /** De lopende service (null als ze niet draait). */
+        @Volatile var current: TrackingService? = null
+            private set
+
+        /**
+         * Trajecten laden: nieuwste van meegeleverd/bijgewerkt, dan manuele correcties (Android/data/…/correcties.tsv),
+         * dan eigen trajecten en eigen correcties uit markeringen (files/eigen*.tsv).
+         */
         fun loadSegments(ctx: Context): List<Segment> {
             val base = SegmentData.openBest(ctx)   // bijgewerkte versie uit GitHub als die nieuwer is
-            val ov = File(ctx.getExternalFilesDir(null), "correcties.tsv")
-            return SegmentStore.parse(base, if (ov.exists()) ov.reader() else null)
+            val extra = listOf(File(ctx.getExternalFilesDir(null), "correcties.tsv"), MarkStore.ownSegmentsFile(ctx))
+                .filter { it.exists() }.map { it.reader() }
+            val geom = listOf(MarkStore.ownCorrectionsFile(ctx)).filter { it.exists() }.map { it.reader() }
+            return SegmentStore.parse(base, extra, geom)
         }
     }
 
@@ -114,12 +123,15 @@ class TrackingService : Service(), LocationListener {
         val notif = buildNotification("Wacht op GPS…")
         startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
 
+        current = this
+        FixHistory.clear()
         val segs = loadSegments(this)
         SegmentData.maybeUpdate(this)   // op de achtergrond; enkel op wifi, hoogstens 1x per dag
         announcer = Announcer(this, settings)
         overlay = OverlayController(this, settings)
         log = DriveLog(this).also { it.note(0.0, if (fromBluetooth) "gestart via Bluetooth" else "gestart manueel") }
         engine = Engine(segs) { e -> onEngineEvent(e) }
+        StatusBus.update { it.copy(rideFile = log?.file?.name) }
         lastMovingT = SystemClock.elapsedRealtimeNanos() / 1e9
         StatusBus.update { it.copy(running = true, segmentCount = segs.size, status = null) }
 
@@ -157,6 +169,9 @@ class TrackingService : Service(), LocationListener {
             is EngineEvent.Approach -> {}
             is EngineEvent.End -> {
                 inSegment = false
+                PassageLog.add(this, PassageLog.Passage(System.currentTimeMillis(), e.segment.id, e.segment.name,
+                    engine.limitOf(e.segment), e.avgKmh, e.segment.poly.length, e.estimated))
+                main.post { MarkStore.resolvePending(this); if (reloadPending) reloadSegments() }
                 val txt = "${e.segment.name}: gemiddeld %.1f km/u (limiet %d)".format(Locale("nl", "BE"), e.avgKmh, e.segment.maxSpeed)
                 StatusBus.update { it.copy(lastResult = txt) }
             }
@@ -172,11 +187,13 @@ class TrackingService : Service(), LocationListener {
         val f = Fix(t, loc.latitude, loc.longitude, speed,
             if (loc.hasAccuracy()) loc.accuracy.toDouble() else 99.0, course)
         log?.fix(f)
+        FixHistory.add(f)
         val st = engine.onFix(f)
         inSegment = st != null
         announcer.onStatus(st, t)
         overlay.update(st)
-        StatusBus.update { it.copy(status = st, gpsOk = f.accuracy <= 30.0) }
+        StatusBus.update { it.copy(status = st, gpsOk = f.accuracy <= 30.0, lat = f.lat, lon = f.lon,
+            heading = course ?: it.heading, gpsKmh = speed * 3.6) }
 
         // automatisch afsluiten na 5 min stilstand (niet bij Bluetooth-start: dan stopt hij in de file)
         if (speed > 2.0) lastMovingT = t
@@ -201,7 +218,32 @@ class TrackingService : Service(), LocationListener {
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) { StatusBus.update { it.copy(gpsOk = false) } }
 
+    // ---------------- voor schermen en markeringen ----------------
+
+    private var reloadPending = false
+
+    fun engineSegments(): Collection<Segment> = engine.segments
+
+    /** Wisselende limiet voor het traject dat nu getoond wordt (null = terug naar de vaste limiet). */
+    fun setLimit(limit: Int?) {
+        val id = StatusBus.state.status?.segmentId ?: return
+        engine.setLimitOverride(id, limit)
+        log?.note(lastFixT, "limiet manueel: ${limit ?: "vast"} voor $id")
+        val st = engine.status(lastFixT)
+        StatusBus.update { it.copy(status = st) }
+    }
+
+    /** Trajecten opnieuw laden (na een markering). Binnen een traject wordt gewacht tot het einde. */
+    fun reloadSegments() {
+        if (engine.activeIds.isNotEmpty()) { reloadPending = true; return }
+        reloadPending = false
+        val segs = loadSegments(this)
+        engine = Engine(segs) { e -> onEngineEvent(e) }
+        StatusBus.update { it.copy(segmentCount = segs.size, dataVersion = it.dataVersion + 1) }
+    }
+
     override fun onDestroy() {
+        if (current === this) current = null
         main.removeCallbacks(stopRunnable)
         if (started) {
             try { lm.removeUpdates(this) } catch (_: Exception) {}

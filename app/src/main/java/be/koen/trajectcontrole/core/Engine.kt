@@ -46,12 +46,16 @@ data class Status(
     val remainingM: Double, val lengthM: Double,
     val estimated: Boolean,       // instaptijd geschat (historiek reikte niet tot het begin)
     val level: Level,
-    val parallel: Int = 0,
-    val maxRestThrKmh: Double = 0.0  // max. snelheid voor de rest om net onder de boetedrempel te eindigen (0 = niet meer haalbaar)         // aantal andere trajecten die tegelijk gevolgd worden
+    val parallel: Int = 0,           // aantal andere trajecten die tegelijk gevolgd worden
+    val maxRestThrKmh: Double = 0.0, // max. snelheid voor de rest om net onder de boetedrempel te eindigen (0 = niet meer haalbaar)
+    val limitOverridden: Boolean = false,  // limiet manueel aangepast (wisselende limiet)
+    val nextName: String? = null,    // aansluitend traject (gekoppeld)
+    val nextLengthM: Double = 0.0,
+    val progressM: Double = 0.0
 )
 
 sealed class EngineEvent {
-    data class Start(val segment: Segment, val tEntry: Double, val estimated: Boolean) : EngineEvent()
+    data class Start(val segment: Segment, val tEntry: Double, val estimated: Boolean, val chained: Boolean = false) : EngineEvent()
     data class End(val segment: Segment, val avgKmh: Double, val tEntry: Double, val tExit: Double, val estimated: Boolean) : EngineEvent()
     data class Left(val segment: Segment) : EngineEvent()
     /** Je rijdt in de juiste richting op het begin van een traject af (afstand in m tot het begin). */
@@ -99,6 +103,17 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
     private var shownId: Long? = null
     private val approached = HashMap<Long, Double>()   // segment-id -> tijdstip laatste naderingsmelding
     val results = mutableListOf<EngineEvent.End>()
+    private val limitOverride = HashMap<Long, Int>()
+
+    /** Alle geladen trajecten (voor kaart en correcties). */
+    val segments: Collection<Segment> get() = segs.values
+    fun segment(id: Long): Segment? = segs[id]
+
+    /** Wisselende limiet: geldt voor de rest van deze passage van dat traject. */
+    fun setLimitOverride(segmentId: Long, limit: Int?) {
+        if (limit == null) limitOverride.remove(segmentId) else limitOverride[segmentId] = limit
+    }
+    fun limitOf(s: Segment): Int = limitOverride[s.id] ?: s.maxSpeed
 
     fun onFix(f: Fix): Status? {
         buf.addLast(f)
@@ -130,19 +145,22 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         val el = t - a.tEntry
         if (el <= 0) return null
         val avg = a.progress / el * 3.6
-        val thr = fineThreshold(s.maxSpeed)
-        val remTimeAtLimit = len / (s.maxSpeed / 3.6) - el
+        val lim = limitOf(s)
+        val thr = fineThreshold(lim)
+        val remTimeAtLimit = len / (lim / 3.6) - el
         val rest = len - a.progress
         val maxRest = if (remTimeAtLimit > 0) rest / remTimeAtLimit * 3.6 else 0.0
         val remTimeAtThr = len / (thr / 3.6) - el
         val maxRestThr = if (remTimeAtThr > 0) rest / remTimeAtThr * 3.6 else 0.0
         val level = when {
-            avg <= s.maxSpeed -> Level.GREEN
+            avg <= lim -> Level.GREEN
             avg <= thr -> Level.ORANGE
             else -> Level.RED
         }
-        return Status(s.id, s.name, s.maxSpeed, thr, avg, maxRest, rest, len, a.estimated, level,
-            maxRestThrKmh = maxRestThr)
+        val next = s.nextIds.firstNotNullOfOrNull { segs[it] }
+        return Status(s.id, s.name, lim, thr, avg, maxRest, rest, len, a.estimated, level,
+            maxRestThrKmh = maxRestThr, limitOverridden = s.id in limitOverride,
+            nextName = next?.name, nextLengthM = next?.poly?.length ?: 0.0, progressM = a.progress)
     }
 
     // ---------------- intern ----------------
@@ -211,9 +229,9 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         return (f.t - prog / maxOf(f.speed, 1.0)) to true
     }
 
-    private fun activate(s: Segment, tEntry: Double, prog: Double, est: Boolean) {
+    private fun activate(s: Segment, tEntry: Double, prog: Double, est: Boolean, chained: Boolean = false) {
         active[s.id] = Active(s, tEntry, maxOf(0.0, prog), est)
-        onEvent(EngineEvent.Start(s, tEntry, est))
+        onEvent(EngineEvent.Start(s, tEntry, est, chained))
     }
 
     private fun updateActive(a: Active, f: Fix) {
@@ -223,7 +241,7 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
         if (pr.distance > LEAVE_DIST) {
             if (a.offSince == null) a.offSince = f.t
             if (f.t - a.offSince!! > LEAVE_TIME) {
-                active.remove(s.id)
+                active.remove(s.id); limitOverride.remove(s.id)
                 onEvent(EngineEvent.Left(s))
             }
             return
@@ -245,13 +263,14 @@ class Engine(segments: List<Segment>, private val onEvent: (EngineEvent) -> Unit
             results.add(end)
             active.remove(s.id)
             onEvent(end)
+            limitOverride.remove(s.id)
             // koppeling: volgend traject start exact op tExit
             for (nid in s.nextIds) {
                 if (nid in active) continue
                 val n = segs[nid] ?: continue
                 val pn = n.poly.project(f.lat, f.lon)
                 if (pn.distance <= MATCH_DIST && pn.progress >= -50) {
-                    activate(n, tExit, pn.progress, a.estimated)
+                    activate(n, tExit, pn.progress, a.estimated, chained = true)
                     active[n.id]!!.tLast = f.t
                     active[n.id]!!.hist.add(f.t to pn.progress)
                     return

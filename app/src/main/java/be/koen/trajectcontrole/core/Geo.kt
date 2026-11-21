@@ -30,6 +30,8 @@ fun headingDeg(dx: Double, dy: Double): Double = (Math.toDegrees(atan2(dx, dy)) 
 data class Projection(val distance: Double, val progress: Double, val heading: Double)
 
 class Polyline(latLons: List<DoubleArray>) {
+    /** De oorspronkelijke punten (lat, lon). */
+    val points: List<DoubleArray> = latLons.map { doubleArrayOf(it[0], it[1]) }
     private val refLat = latLons[0][0]
     private val refLon = latLons[0][1]
     private val xs: DoubleArray
@@ -55,6 +57,28 @@ class Polyline(latLons: List<DoubleArray>) {
 
     fun nearBox(lat: Double, lon: Double, marginDeg: Double = 0.003): Boolean =
         lat >= minLat - marginDeg && lat <= maxLat + marginDeg && lon >= minLon - marginDeg && lon <= maxLon + marginDeg
+
+    /** Punt (lat, lon) op afstand [progress] langs de lijn (begrensd tot 0..lengte). */
+    fun pointAt(progress: Double): DoubleArray {
+        val d = progress.coerceIn(0.0, length)
+        var i = 0
+        while (i < cum.size - 2 && cum[i + 1] < d) i++
+        val seg = cum[i + 1] - cum[i]
+        val f = if (seg <= 0) 0.0 else (d - cum[i]) / seg
+        val a = points[i]; val b = points[i + 1]
+        return doubleArrayOf(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+    }
+
+    /** Deel van de lijn tussen twee afstanden (in meter), als lijst punten. */
+    fun slice(from: Double, to: Double): List<DoubleArray> {
+        val a = from.coerceIn(0.0, length); val b = to.coerceIn(0.0, length)
+        if (b <= a) return emptyList()
+        val out = ArrayList<DoubleArray>()
+        out.add(pointAt(a))
+        for (i in cum.indices) if (cum[i] > a && cum[i] < b) out.add(points[i])
+        out.add(pointAt(b))
+        return out
+    }
 
     fun project(lat: Double, lon: Double): Projection {
         val p = toXY(lat, lon, refLat, refLon)

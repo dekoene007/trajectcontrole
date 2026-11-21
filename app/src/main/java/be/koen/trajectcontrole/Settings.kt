@@ -37,4 +37,9 @@ class Settings(ctx: Context) {
         get() = p.getBoolean("speak_end", true); set(v) = p.edit().putBoolean("speak_end", v).apply()
     var speakTooFast: Boolean
         get() = p.getBoolean("speak_too_fast", true); set(v) = p.edit().putBoolean("speak_too_fast", v).apply()
+
+    // --- markeren ---
+    /** Reactietijd: de markering wordt zoveel seconden vóór de tik gelegd (je tikt altijd iets te laat). */
+    var reactionSec: Float
+        get() = p.getFloat("reaction_sec", 0.8f); set(v) = p.edit().putFloat("reaction_sec", v).apply()
 }

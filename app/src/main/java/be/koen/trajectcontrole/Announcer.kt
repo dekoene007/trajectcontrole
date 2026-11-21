@@ -84,7 +84,8 @@ class Announcer(context: Context, private val settings: Settings) : TextToSpeech
             is EngineEvent.Start -> {
                 if (settings.speakStart) {
                     val extra = if (e.estimated) ", begin geschat" else ""
-                    say("Trajectcontrole, ${km(e.segment.poly.length)} kilometer, ${e.segment.maxSpeed}$extra.")
+                    val what = if (e.chained) "Aansluitend traject" else "Trajectcontrole"
+                    say("$what, ${km(e.segment.poly.length)} kilometer, ${e.segment.maxSpeed}$extra.")
                 }
             }
             is EngineEvent.End -> {
