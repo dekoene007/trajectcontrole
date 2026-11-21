@@ -81,8 +81,11 @@ class MapLayers(private val style: Style) {
         style.getLayerAs<LineLayer>("done")?.setProperties(PropertyFactory.lineColor(col))
         style.getLayerAs<LineLayer>("rest")?.setProperties(PropertyFactory.lineColor(col))
         set("done", MapData.activeDone(seg, st)); set("rest", MapData.activeRest(seg, st))
-        set("pos", MapData.position(s.lat, s.lon))
+        if (s.lat == null || s.lon == null) set("pos", MapData.position(null, null))
     }
+
+    /** Positiebol apart, zodat hij per beeld vloeiend kan bewegen. */
+    fun setPos(lat: Double, lon: Double) = set("pos", MapData.position(lat, lon))
 }
 
 /**

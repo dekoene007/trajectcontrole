@@ -227,7 +227,19 @@ class MainActivity : Activity() {
 
     private var layers: MapLayers? = null
     private var lastZoom = 15.0
-    private var lastCam = 0L
+    private val anim = be.koen.trajectcontrole.ui.PosAnimator { lat, lon, z -> frame(lat, lon, z) }
+
+    private fun mapArea() = android.graphics.RectF(0f, card.bottom.toFloat(), mapView.width.toFloat(), bottom.top.toFloat())
+
+    /** Per beeld: bol en (tenzij je zelf verschuift) camera samen bewegen. */
+    private fun frame(lat: Double, lon: Double, zoom: Double) {
+        val m = map ?: return
+        layers?.setPos(lat, lon)
+        if (SystemClock.elapsedRealtime() - userMovedAt < 20_000) return
+        val area = mapArea()
+        if (area.height() < 100 || area.width() < 100) return
+        MapCamera.follow(m, lat, lon, zoom, area, mapView.width, mapView.height, resources.displayMetrics.density, 0)
+    }
 
     private fun updateMap(s: StatusBus.State) {
         val m = map ?: return
@@ -239,17 +251,14 @@ class MainActivity : Activity() {
         }
         l.update(this, s, segs, changed)
         val lat = s.lat ?: return; val lon = s.lon ?: return
-        if (SystemClock.elapsedRealtime() - userMovedAt < 20_000) return   // even niet volgen na zelf verschuiven
         // positie centraal in het vrije deel tussen paneel en knoppen; hele traject in beeld
-        val area = android.graphics.RectF(0f, card.bottom.toFloat(), mapView.width.toFloat(), bottom.top.toFloat())
-        if (area.height() < 100 || area.width() < 100) return
+        val area = mapArea()
         val seg = s.status?.let { segs[it.segmentId] }
-        val density = resources.displayMetrics.density
-        val z = if (seg != null) MapCamera.zoomFor(lat, lon, seg.poly.points, area, density) else 15.0
-        if (Math.abs(z - lastZoom) > 0.15) lastZoom = z
-        val now = SystemClock.elapsedRealtime()
-        MapCamera.follow(m, lat, lon, lastZoom, area, mapView.width, mapView.height, density, if (now - lastCam > 3000) 0 else 1000)
-        lastCam = now
+        if (seg != null && area.height() >= 100 && area.width() >= 100) {
+            val z = MapCamera.zoomFor(lat, lon, seg.poly.points, area, resources.displayMetrics.density)
+            if (Math.abs(z - lastZoom) > 0.15) lastZoom = z
+        } else if (seg == null) lastZoom = 15.0
+        anim.target(lat, lon, lastZoom)
     }
 
     // ---------------- weergave ----------------
@@ -352,7 +361,7 @@ class MainActivity : Activity() {
         window.decorView.requestApplyInsets()
     }
     override fun onPause() { mapView.onPause(); super.onPause() }
-    override fun onStop() { StatusBus.unlisten(listener); mapView.onStop(); super.onStop() }
+    override fun onStop() { StatusBus.unlisten(listener); anim.reset(); mapView.onStop(); super.onStop() }
     override fun onDestroy() { mapView.onDestroy(); super.onDestroy() }
     override fun onLowMemory() { super.onLowMemory(); mapView.onLowMemory() }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); mapView.onSaveInstanceState(outState) }

@@ -47,8 +47,9 @@ class TrackingService : Service(), LocationListener {
         const val EXTRA_FROM_BT = "from_bt"
         private const val IDLE_STOP_S = 300.0
 
-        fun start(ctx: Context, fromBluetooth: Boolean = false) {
-            val i = Intent(ctx, TrackingService::class.java).putExtra(EXTRA_FROM_BT, fromBluetooth)
+        fun start(ctx: Context, fromBluetooth: Boolean = false, fromCar: Boolean = false) {
+            val i = Intent(ctx, TrackingService::class.java).putExtra(EXTRA_FROM_BT, fromBluetooth || fromCar)
+                .putExtra("from_car", fromCar)
             ctx.startForegroundService(i)
         }
         fun stop(ctx: Context) {
@@ -86,9 +87,24 @@ class TrackingService : Service(), LocationListener {
     private var started = false
     private var fromBluetooth = false
     private var btReceiverRegistered = false
+    private var carLinked = false
     private val stopRunnable = Runnable {
-        log?.note(lastFixT, "gestopt: Bluetooth verbroken")
+        log?.note(lastFixT, "gestopt: auto verbroken")
         stopSelf()
+    }
+
+    /** Android Auto verbonden: geplande stop annuleren; de app hoort bij de rit (geen stop na stilstand). */
+    fun carConnected() {
+        main.removeCallbacks(stopRunnable); fromBluetooth = true; carLinked = true
+        log?.note(lastFixT, "Android Auto verbonden")
+    }
+
+    /** Android Auto afgesloten (auto uit, kabel/draadloos weg): stoppen na dezelfde wachttijd als bij Bluetooth. */
+    fun carDisconnected() {
+        if (!carLinked) return
+        main.removeCallbacks(stopRunnable)
+        main.postDelayed(stopRunnable, settings.btStopDelaySec * 1000L)
+        log?.note(lastFixT, "Android Auto verbroken, stop over ${settings.btStopDelaySec} s")
     }
 
     /** Volgt verbinden/verbreken van de gekozen auto-Bluetooth zolang de service loopt. */
@@ -97,7 +113,7 @@ class TrackingService : Service(), LocationListener {
             val addr = i.btDevice()?.address ?: return
             if (addr !in settings.btDevices) return
             when (i.action) {
-                BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (settings.btAutostart) {
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (settings.btAutostart || fromBluetooth) {
                     main.removeCallbacks(stopRunnable)
                     main.postDelayed(stopRunnable, settings.btStopDelaySec * 1000L)
                     log?.note(lastFixT, "Bluetooth verbroken, stop over ${settings.btStopDelaySec} s")
@@ -115,6 +131,7 @@ class TrackingService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
         if (intent?.getBooleanExtra(EXTRA_FROM_BT, false) == true) fromBluetooth = true
+        if (intent?.getBooleanExtra("from_car", false) == true) { carLinked = true; main.removeCallbacks(stopRunnable) }
         if (started) return START_STICKY
         started = true
 

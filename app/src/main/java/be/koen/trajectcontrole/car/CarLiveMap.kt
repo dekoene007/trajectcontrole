@@ -54,7 +54,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
     private var segs: Map<Long, Segment> = emptyMap()
     private var segVersion = -1
     private var lastZoom = 15.0
-    private var lastCam = 0L
+    private val anim = be.koen.trajectcontrole.ui.PosAnimator { lat, lon, z -> frame(lat, lon, z) }
 
     init { MapLibre.getInstance(ctx) }
 
@@ -107,6 +107,7 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
     }
 
     fun release() {
+        anim.reset()
         try { mapView?.onPause(); mapView?.onStop(); mapView?.onDestroy() } catch (_: Exception) {}
         try { pres?.dismiss() } catch (_: Exception) {}
         vd?.release()
@@ -171,13 +172,18 @@ class CarLiveMap(private val ctx: CarContext) : SurfaceCallback {
         val lat = s.lat ?: return; val lon = s.lon ?: return
         val seg = s.status?.let { segs[it.segmentId] }
         val area = mapArea(c.width, c.height, s.status != null)
-        val density = c.dpi / 160f
-        val z = if (seg != null) MapCamera.zoomFor(lat, lon, seg.poly.points, area, density) else 15.0
+        val z = if (seg != null) MapCamera.zoomFor(lat, lon, seg.poly.points, area, c.dpi / 160f) else 15.0
         if (Math.abs(z - lastZoom) > 0.15 || force) lastZoom = z
-        val now = SystemClock.elapsedRealtime()
-        val ms = if (force || now - lastCam > 3000) 0 else 1000
-        lastCam = now
-        MapCamera.follow(m, lat, lon, lastZoom, area, c.width, c.height, density, ms)
+        if (force) anim.redraw()
+        anim.target(lat, lon, lastZoom)
+    }
+
+    /** Per beeld: bol en camera samen verschuiven, zodat de bol vloeiend in het midden blijft. */
+    private fun frame(lat: Double, lon: Double, zoom: Double) {
+        val c = container ?: return; val m = map ?: return
+        layers?.setPos(lat, lon)
+        val area = mapArea(c.width, c.height, StatusBus.state.status != null)
+        MapCamera.follow(m, lat, lon, zoom, area, c.width, c.height, c.dpi / 160f, 0)
     }
 
     /** Ons paneel (meter, tegels, voortgang), getekend boven de kaart. */

@@ -35,6 +35,12 @@ class SpeedCarAppService : CarAppService() {
         if (sessionInfo.displayType == SessionInfo.DISPLAY_TYPE_CLUSTER) ClusterSession() else MainSession()
 
     private class MainSession : Session() {
+        init {
+            lifecycle.addObserver(object : DefaultLifecycleObserver {
+                // Android Auto weg (auto uit, verbinding verbroken): app stopt na de ingestelde wachttijd
+                override fun onDestroy(owner: LifecycleOwner) { TrackingService.current?.carDisconnected() }
+            })
+        }
         override fun onCreateScreen(intent: Intent): Screen {
             autoStart(carContext)
             return CarMapScreen(carContext)
@@ -48,9 +54,9 @@ class SpeedCarAppService : CarAppService() {
     companion object {
         /** Volgen starten zodra Android Auto de app opent (zolang Android Auto actief is, blijft de app actief). */
         fun autoStart(ctx: CarContext) {
-            if (StatusBus.state.running) return
+            if (StatusBus.state.running) { TrackingService.current?.carConnected(); return }
             if (ctx.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-            try { TrackingService.start(ctx) } catch (_: Exception) { /* Android weigerde: knop ▶ blijft beschikbaar */ }
+            try { TrackingService.start(ctx, fromCar = true) } catch (_: Exception) { /* Android weigerde: knop ▶ blijft beschikbaar */ }
         }
     }
 }
