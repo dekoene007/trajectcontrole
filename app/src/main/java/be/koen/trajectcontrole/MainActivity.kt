@@ -15,6 +15,8 @@ import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -71,6 +73,7 @@ class MainActivity : Activity() {
     private lateinit var card: LinearLayout
     private lateinit var bottom: LinearLayout
 
+    private lateinit var attributionView: TextView
     private var segs: Map<Long, Segment> = emptyMap()
     private var drawnActive: Long? = Long.MIN_VALUE
     private var drawnVersion = -1
@@ -99,6 +102,16 @@ class MainActivity : Activity() {
         root.addView(card, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { setMargins(dpi(10f), dpi(10f), dpi(10f), 0) })
         bottom = buildBottom()
         root.addView(bottom, FrameLayout.LayoutParams(-1, dpi(96f), Gravity.BOTTOM).apply { setMargins(dpi(10f), 0, dpi(10f), dpi(16f)) })
+        attributionView = root.getChildAt(1) as TextView
+        // paneel en knoppen nooit onder de statusbalk, camera-uitsparing of navigatiebalk
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            (card.layoutParams as FrameLayout.LayoutParams).topMargin = dpi(10f) + b.top
+            (bottom.layoutParams as FrameLayout.LayoutParams).bottomMargin = dpi(16f) + b.bottom
+            (attributionView.layoutParams as FrameLayout.LayoutParams).bottomMargin = dpi(120f) + b.bottom
+            card.requestLayout(); bottom.requestLayout(); attributionView.requestLayout()
+            insets
+        }
         setContentView(root)
 
         mapView.getMapAsync { m ->
@@ -213,13 +226,16 @@ class MainActivity : Activity() {
 
     private fun addLayers(st: Style) {
         fun src(id: String) = st.addSource(GeoJsonSource(id, MapData.EMPTY))
-        listOf("others", "starts", "done", "rest", "aStart", "aEnd", "marks", "pos").forEach { src(it) }
+        listOf("others", "starts", "ends", "both", "done", "rest", "aStart", "aEnd", "marks", "pos").forEach { src(it) }
+        // andere trajecten: volle lijn in lichtblauw-grijs, goed zichtbaar op de donkere kaart
         st.addLayer(LineLayer("others", "others").withProperties(
-            PropertyFactory.lineColor(Theme.hex(Theme.OTHER)), PropertyFactory.lineWidth(3f),
-            PropertyFactory.lineDasharray(arrayOf(2f, 1.5f)), PropertyFactory.lineOpacity(0.8f)))
-        st.addLayer(CircleLayer("starts", "starts").withProperties(
-            PropertyFactory.circleRadius(4f), PropertyFactory.circleColor(Theme.hex(Theme.BG)),
-            PropertyFactory.circleStrokeColor(Theme.hex(Theme.OK)), PropertyFactory.circleStrokeWidth(2f)))
+            PropertyFactory.lineColor(Theme.hex(Theme.TRACK)), PropertyFactory.lineWidth(4f),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND), PropertyFactory.lineOpacity(0.9f)))
+        // begin (groen), einde (wit), tweerichting (grijs); pas vanaf zoom 10 om de kaart rustig te houden
+        fun dots(id: String, fill: Int) = st.addLayer(CircleLayer(id, id).withProperties(
+            PropertyFactory.circleRadius(5f), PropertyFactory.circleColor(Theme.hex(fill)),
+            PropertyFactory.circleStrokeColor(Theme.hex(Theme.BG)), PropertyFactory.circleStrokeWidth(2f)).apply { minZoom = 10f })
+        dots("starts", Theme.OK); dots("ends", Theme.TEXT); dots("both", Theme.TRACK)
         st.addLayer(LineLayer("rest", "rest").withProperties(
             PropertyFactory.lineColor(Theme.hex(Theme.ORANGE)), PropertyFactory.lineWidth(6f), PropertyFactory.lineOpacity(0.45f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND)))
@@ -255,7 +271,8 @@ class MainActivity : Activity() {
         val seg = st?.let { segs[it.segmentId] }
         if (st?.segmentId != drawnActive) {
             set("others", MapData.others(segs.values, st?.segmentId))
-            set("starts", MapData.starts(segs.values, st?.segmentId))
+            val (sv, ev, bv) = MapData.endpoints(segs.values, st?.segmentId)
+            set("starts", sv); set("ends", ev); set("both", bv)
             set("aStart", MapData.activeStart(seg)); set("aEnd", MapData.activeEnd(seg))
             if (seg != null) fitSegment(m, seg)
             drawnActive = st?.segmentId
@@ -272,7 +289,7 @@ class MainActivity : Activity() {
         val b = LatLngBounds.Builder()
         seg.poly.points.forEach { b.include(LatLng(it[0], it[1])) }
         val bounds = try { b.build() } catch (_: Exception) { return }
-        val top = card.height + dpi(30f); val bot = bottom.height + dpi(40f)
+        val top = card.bottom + dpi(24f); val bot = (mapView.height - bottom.top) + dpi(32f)
         m.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, dpi(40f), top, dpi(40f), bot), 800)
     }
 
@@ -290,6 +307,7 @@ class MainActivity : Activity() {
                 append("${s.segmentCount.takeIf { it > 0 } ?: "—"} trajecten · ${dataAge()}")
                 s.lastResult?.let { append("\nLaatste: $it") }
             }
+            idleText.append(legend())
             limitBtn.isEnabled = false; limitBtn.alpha = 0.4f
         } else {
             activeBox.visibility = View.VISIBLE; idleBox.visibility = View.GONE
@@ -307,6 +325,18 @@ class MainActivity : Activity() {
             limitBtn.isEnabled = true; limitBtn.alpha = 1f
         }
         updateMap(s)
+    }
+
+    /** Legenda van de kaart: lijn = traject, groen = begin, wit = einde, grijs = beide richtingen. */
+    private fun legend(): CharSequence {
+        val sb = android.text.SpannableStringBuilder("\n")
+        fun item(sym: String, color: Int, label: String) {
+            val a = sb.length; sb.append(sym)
+            sb.setSpan(android.text.style.ForegroundColorSpan(color), a, sb.length, 0)
+            sb.append(" $label   ")
+        }
+        item("━", Theme.TRACK, "traject"); item("●", Theme.OK, "begin"); item("●", Theme.TEXT, "einde"); item("●", Theme.TRACK, "beide richtingen")
+        return sb
     }
 
     /** Tegel: klein grijs label met daaronder een groot vet getal, beide gecentreerd. */
@@ -355,7 +385,16 @@ class MainActivity : Activity() {
     }
 
     override fun onStart() { super.onStart(); mapView.onStart(); StatusBus.listen(listener); SegmentData.maybeUpdate(this) }
-    override fun onResume() { super.onResume(); mapView.onResume() }
+    override fun onResume() { super.onResume(); mapView.onResume(); applyFullscreen() }
+
+    private fun applyFullscreen() {
+        val c = window.insetsController ?: return
+        if (Settings(this).fullscreen) {
+            c.hide(WindowInsets.Type.systemBars())
+            c.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else c.show(WindowInsets.Type.systemBars())
+        window.decorView.requestApplyInsets()
+    }
     override fun onPause() { mapView.onPause(); super.onPause() }
     override fun onStop() { StatusBus.unlisten(listener); mapView.onStop(); super.onStop() }
     override fun onDestroy() { mapView.onDestroy(); super.onDestroy() }

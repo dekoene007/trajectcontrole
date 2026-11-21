@@ -30,6 +30,10 @@ class SettingsActivity : Activity() {
         s = Settings(this)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 96, 48, 96) }
         setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(24, 24, 28)); addView(root) })
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val b = insets.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
+            v.setPadding(48, 48 + b.top, 48, 96 + b.bottom); insets
+        }
     }
 
     override fun onResume() { super.onResume(); build() }   // permissies kunnen intussen gewijzigd zijn
@@ -50,6 +54,10 @@ class SettingsActivity : Activity() {
         header("Automatisch afsluiten")
         switch("Afsluiten na 5 minuten stilstand", s.autoStopIdle) { s.autoStopIdle = it }
         note("Enkel als je manueel gestart bent. Bij starten via Bluetooth stopt de app pas als de auto uit is, zodat hij niet in de file afsluit. Nooit midden in een traject.")
+
+        header("Scherm")
+        switch("Volledig scherm (zonder statusbalk)", s.fullscreen) { s.fullscreen = it }
+        note("Verbergt de status- en navigatiebalk op het hoofdscherm. Veeg vanaf de boven- of onderrand om ze even te tonen. Het paneel blijft altijd onder de camera-uitsparing.")
 
         header("Overlay")
         switch("Toon overlay over andere apps", s.overlay) { on ->

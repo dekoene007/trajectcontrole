@@ -16,12 +16,22 @@ object MapData {
     private fun fc(features: List<String>) = """{"type":"FeatureCollection","features":[${features.joinToString(",")}]}"""
     val EMPTY = fc(emptyList())
 
-    /** Alle trajecten behalve het actieve (één richting volstaat: omgekeerde kopieën overslaan). */
+    /** Alle trajecten behalve het actieve (omgekeerde kopieën van tweerichtingstrajecten overslaan). */
     fun others(segs: Collection<Segment>, activeId: Long?): String =
         fc(segs.filter { it.id > 0 && it.id != activeId && it.id != -(activeId ?: 0) }.map { line(it.poly.points) })
 
-    fun starts(segs: Collection<Segment>, activeId: Long?): String =
-        fc(segs.filter { it.id > 0 && it.id != activeId }.map { point(it.poly.points.first()) })
+    private fun isBidir(segs: Map<Long, Segment>, s: Segment) = segs.containsKey(-s.id)
+
+    /** Begin (groen) en einde (wit) van eenrichtingstrajecten; tweerichtingstrajecten krijgen aan beide uiteinden een grijs punt. */
+    fun endpoints(segs: Collection<Segment>, activeId: Long?): Triple<String, String, String> {
+        val byId = segs.associateBy { it.id }
+        val list = segs.filter { it.id > 0 && it.id != activeId && it.id != -(activeId ?: 0) }
+        val one = list.filter { !isBidir(byId, it) }; val two = list.filter { isBidir(byId, it) }
+        return Triple(
+            fc(one.map { point(it.poly.points.first()) }),
+            fc(one.map { point(it.poly.points.last()) }),
+            fc(two.flatMap { listOf(point(it.poly.points.first()), point(it.poly.points.last())) }))
+    }
 
     /** Actief traject: afgelegd en resterend deel. */
     fun activeDone(seg: Segment?, st: Status?): String =

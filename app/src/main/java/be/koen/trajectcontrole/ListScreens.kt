@@ -29,6 +29,10 @@ abstract class DarkListActivity : Activity() {
         window.statusBarColor = Theme.BG
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16f), dp(24f), dp(16f), dp(24f)) }
         setContentView(ScrollView(this).apply { setBackgroundColor(Theme.BG); addView(list) })
+        list.setOnApplyWindowInsetsListener { v, insets ->
+            val b = insets.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
+            v.setPadding(dp(16f), dp(24f) + b.top, dp(16f), dp(24f) + b.bottom); insets
+        }
     }
 
     override fun onResume() { super.onResume(); build() }

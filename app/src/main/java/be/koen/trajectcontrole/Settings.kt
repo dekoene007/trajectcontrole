@@ -42,4 +42,8 @@ class Settings(ctx: Context) {
     /** Reactietijd: de markering wordt zoveel seconden vóór de tik gelegd (je tikt altijd iets te laat). */
     var reactionSec: Float
         get() = p.getFloat("reaction_sec", 0.8f); set(v) = p.edit().putFloat("reaction_sec", v).apply()
+
+    /** Gsm-scherm zonder statusbalk en navigatiebalk (veeg vanaf de rand om ze even te tonen). */
+    var fullscreen: Boolean
+        get() = p.getBoolean("fullscreen", false); set(v) = p.edit().putBoolean("fullscreen", v).apply()
 }

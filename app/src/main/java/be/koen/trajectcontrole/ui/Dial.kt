@@ -27,6 +27,7 @@ object Theme {
     val RED = Color.rgb(255, 107, 107)
     val BLUE = Color.rgb(90, 169, 255)
     val OTHER = Color.rgb(107, 122, 144)
+    val TRACK = Color.rgb(140, 170, 210)     // andere trajecten op de kaart
 
     fun level(l: Level?) = when (l) { Level.GREEN -> OK; Level.ORANGE -> ORANGE; Level.RED -> RED; null -> MUTED }
     fun hex(c: Int) = String.format("#%06X", 0xFFFFFF and c)
