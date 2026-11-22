@@ -1,7 +1,8 @@
 name: APK-archief aanvullen
 
 # Eenmalig/hulpmiddel: maakt voor elke appversie waarvan nog een build-artefact bestaat een release
-# app-v<versie> met de APK, zodat CHANGELOG.md per versie naar de APK kan linken.
+# app-v<versie> met de APK, zodat CHANGELOG.md per versie naar de APK kan linken. De tag wijst naar main
+# (een tag op een oude commit met andere workflows mag het token niet maken); de build-commit staat in de tekst.
 on:
   workflow_dispatch:
 
@@ -28,6 +29,6 @@ jobs:
             if gh release view "app-v$V" >/dev/null 2>&1; then echo "app-v$V bestaat al"; continue; fi
             rm -rf a && mkdir a
             gh api "repos/$R/actions/artifacts/$ID/zip" > a/a.zip && (cd a && unzip -q a.zip)
-            gh release create "app-v$V" "a/trajectcontrole-$V.apk" --target "$SHA" --latest=false \
+            gh release create "app-v$V" "a/trajectcontrole-$V.apk" --latest=false \
               --title "App $V" --notes "APK van versie $V (build $SHA). Release notes: CHANGELOG.md."
           done < lijst.txt
