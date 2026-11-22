@@ -5,7 +5,7 @@ name: App bouwen
 on:
   push:
     branches: [main]
-    paths: ["app/**", "build.gradle.kts", "settings.gradle.kts", "gradle/**", ".github/workflows/app-bouwen.yml"]
+    paths: ["app/**", "build.gradle.kts", "settings.gradle.kts", "gradle/**", "CHANGELOG.md", ".github/workflows/app-bouwen.yml"]
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Release notes aanwezig?
+        run: |
+          V=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          # sectie "## <versie> – <datum>" in CHANGELOG.md; de tekst gaat mee in de release
+          awk -v v="$V" 'index($0, "## " v " ")==1{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::Geen sectie '## $V – <datum>' in CHANGELOG.md. Voeg release notes toe voor $V."; exit 1
+          fi
+          cat notes.md
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -41,6 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.v.outputs.versie }}
         run: |
+          printf '\n---\nAutomatisch gebouwd uit main (%s). Installeer via UnknownAuto. Alle versies: CHANGELOG.md\n' "$GITHUB_SHA" >> notes.md
           gh release delete "app-laatste" --yes --cleanup-tag 2>/dev/null || true
           gh release create "app-laatste" "trajectcontrole-$V.apk" --title "App $V (laatste build)" \
-            --notes "Automatisch gebouwd uit main ($GITHUB_SHA). Installeer via UnknownAuto." --latest
+            --notes-file notes.md --latest

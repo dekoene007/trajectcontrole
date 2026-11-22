@@ -1,35 +1,32 @@
 # Trajectcontrole – gemiddelde snelheid (Android + Android Auto)
 
 App voor eigen gebruik die de gemiddelde snelheid binnen Belgische trajectcontroles volgt, naast Waze.
-Versie 0.4, 4 november 2026.
+**Versie 0.9.3, 21 november 2026.** Wat er per versie veranderde: [CHANGELOG.md](CHANGELOG.md).
 
-**Buildversies:** Android Gradle Plugin 8.13.2 · Gradle 8.13 (wrapper) · Kotlin 2.2.21 · JDK 17 · compileSdk 36 / targetSdk 35. Android Studio zou geen upgrade meer mogen voorstellen.
+**Buildversies:** Android Gradle Plugin 8.13.2 · Gradle 8.13 (wrapper) · Kotlin 2.2.21 · JDK 17 · Car App Library 1.7.0 ·
+targetSdk 36 · MapLibre 11.8.0.
 
 ## Wat de app doet
 
 - **Volgt je positie elke seconde** via GPS, in een voorgrondservice met een vaste melding.
-- **Herkent trajecten** door voortdurend je positie op de trajectlijn te leggen, niet via een startpunt dat je kan missen.
+- **Herkent trajecten** door je positie voortdurend op de trajectlijn te leggen, niet via een startpunt dat je kan missen.
   - Wordt een traject laat herkend, dan zoekt de app in de laatste 15 minuten GPS-historiek het echte instapmoment terug.
-  - Aaneensluitende trajecten worden expliciet gekoppeld (bv. E40 Zwijnaarde → Drongen → Aalter → Beernem). Het volgende traject start op exact hetzelfde moment als het vorige eindigt.
-- **Toont op de telefoon en in Android Auto:**
-  - het gemiddelde tot nu toe, met kleur:
-    - groen: tot de limiet
-    - oranje: tussen de limiet en de boetedrempel
-    - rood: boven de boetedrempel
-  - het maximum voor de rest van het traject
-  - de resterende afstand
-- **Spraak** (Waze en muziek gaan even zachter):
-  - bij het binnenrijden
-  - als de kleur verandert
-  - elke 45 s zolang je in het rood zit
-  - bij het verlaten, met je eindgemiddelde
-- **Logboek** per rit (CSV) voor de vergelijkingsritten met Flitsmeister.
-- **Nieuw in 0.3** (*Instellingen* op het hoofdscherm):
-  - **Automatisch starten via Bluetooth**: de app start zodra je telefoon verbindt met de gekozen auto. Hij stopt 30 s na het verbreken; even opnieuw verbinden binnen die tijd stopt de app niet.
-  - **Automatisch afsluiten na 5 min stilstand**: geldt enkel bij manueel starten, zodat de app bij een Bluetooth-start niet in de file afsluit. Nooit midden in een traject.
-  - **Overlay** boven Waze op het telefoonscherm: het gemiddelde in een gekleurde cirkel, de limiet in een rode ring. Verschijnt enkel binnen een traject en is versleepbaar.
-  - **Melding ±400 m voor het begin** van een traject.
-  - **Spraak per soort aan of uit**: nadering, begin, einde, te snel.
+  - Overlappende trajecten worden tegelijk gevolgd; het strengste wordt getoond.
+  - Aaneensluitende trajecten worden gekoppeld en aangekondigd ("aansluitend …").
+- **Toont** (gsm en Android Auto): een meter met het gemiddelde tot nu toe, de huidige snelheid, limiet en
+  boetedrempel, de voortgang en resterende afstand. Kleur van meter en trajectlijn:
+  - groen: tot de limiet
+  - oranje: tussen de limiet en de boetedrempel
+  - rood: boven de boetedrempel
+- **Kaart** met het actieve traject (gereden/rest), de andere trajecten (begin, einde, beide richtingen) en eigen
+  markeringen. De camera volgt je vloeiend, met het hele traject in beeld.
+- **Spraak** (Waze en muziek gaan even zachter): ±400 m voor het begin, bij het binnenrijden, als de kleur
+  verandert, elke 45 s in het rood, bij het verlaten met je eindgemiddelde, en bij een aansluitend traject.
+  Elk soort apart aan of uit; "maximaal … tot het einde" enkel op aanvraag.
+- **Tijdelijke limiet**: geldt er een andere limiet (werken, variabele borden), stel ze in via de knop *Limiet*.
+  Ze vervalt aan het einde van het traject.
+- **Passages**: logboek van elke afgewerkte passage met eindgemiddelde. Eigen controle, geen bewijs (GPS ≠ teller).
+- **Ritlogboek** per rit (CSV) met elke GPS-positie en de gebeurtenissen (start, stop, Bluetooth, Android Auto).
 
 Boetedrempel (technische correctie BE: −6 km/u onder 100, −6 % vanaf 100):
 
@@ -37,148 +34,130 @@ Boetedrempel (technische correctie BE: −6 km/u onder 100, −6 % vanaf 100):
 |---|---|---|---|---|---|
 | Rood boven (gemeten) | 36 | 56 | 76 | 96 | 127,7 |
 
-- **Nieuw in 0.4: trajectdata wordt automatisch bijgewerkt.** Zie *Trajectdata bijwerken* hieronder.
+## Android Auto
 
-## Bouwen en installeren
+- De app is een **navigatie-app** in Android Auto. Daardoor:
+  - werkt ze in het **gesplitste scherm** naast Waze en Spotify, of volledig scherm;
+  - toont ze een levende kaart met links één paneel (naam op 2 regels, meter, *Nu*, *Limiet · boete*, voortgang);
+  - toont ze op het **tweede scherm** (instrumentenpaneel), als de auto dat aan navigatie-apps aanbiedt, enkel de
+    meter met "Limiet · boete · nog x km".
+- Knoppen rechtsboven: **Markeer**, **Limiet**, **Start/Stop**. Android Auto verbergt ze zelf na een tijdje;
+  tik op het scherm om ze terug te tonen. Dat kan een app niet uitschakelen.
+- Het volgen start vanzelf zodra je de app in Android Auto opent, en stopt 30 s nadat Android Auto afsluit.
 
-1. Open de map in **Android Studio** (Ladybug of nieuwer) via *File → Open*. Laat Gradle synchroniseren; dat duurt de eerste keer een paar minuten.
-2. Zet op je telefoon *Ontwikkelaarsopties → USB-foutopsporing* aan en sluit de telefoon aan.
-3. Druk op **Run**. De app wordt geïnstalleerd.
-   - Een losse APK maken kan ook: *Build → Build App Bundle(s) / APK(s) → Build APK(s)*.
-4. Open de app, tik **Starten** en sta locatie en meldingen toe.
+## Installeren
 
-### Automatisch starten via Bluetooth (eenmalig instellen)
+Elke wijziging aan de app wordt in GitHub Actions gebouwd (workflow *App bouwen*). De nieuwste APK staat altijd bij
+de release **app-laatste** (Releases, rechts op de startpagina van de repository), met de release notes van die versie.
 
-*Instellingen → Starten bij verbinden met de auto*, en volg dan de stappen op het scherm:
+1. Installeer de APK op de gsm via **UnknownAuto** (met Shizuku). Zo krijgt de app de Play-herkomst die Android Auto
+   vereist; een gewone installatie wordt in de auto geweigerd ("Package DENIED").
+2. Open de app, tik **Starten** en sta locatie en meldingen toe.
+3. Android Auto: *Launcher aanpassen* → **Trajectcontrole** aanvinken.
 
-1. Geef toestemming voor *Apparaten in de buurt* en vink je auto aan in de lijst van gekoppelde toestellen.
-2. Zet *Locatie* op **Altijd toestaan**. Zonder dit weigert Android om de app vanuit de achtergrond te starten.
-3. Sta een **uitzondering op batterijoptimalisatie** toe. Sommige fabrikanten blokkeren anders de Bluetooth-trigger.
+De APK is ondertekend met de vaste sleutel in `app/signing/` (enkel persoonlijk gebruik). Een build uit Android Studio
+en een build uit Actions kunnen elkaar daardoor bijwerken zonder te verwijderen.
 
-Weigert Android het starten toch, dan krijg je een melding *Tik om te starten*.
+### Instellingen
 
-### Android Auto
+- **Starten bij verbinden met de auto (Bluetooth)**: start zodra de gsm verbindt met het gekozen toestel en stopt
+  30 s na het verbreken (opnieuw verbinden binnen die tijd stopt niet). Volg de stappen op het scherm: toestemming
+  *Apparaten in de buurt*, auto aanvinken, locatie **Altijd toestaan**, uitzondering op batterijoptimalisatie.
+- **Afsluiten na 5 minuten stilstand**: standaard uit; nooit midden in een traject of bij een rit vanuit de auto.
+- **Reactietijd** bij markeren (standaard 0,8 s), **overlay** boven andere apps, **volledig scherm**, spraak per soort.
+- **Trajectdata → Nu controleren**: nieuwe data meteen ophalen (ook via mobiele data).
+- Onderaan: diagnose van de schermruimte die Android Auto doorgeeft.
 
-1. Android Auto-instellingen → tik ±10× op *Versie* → bevestig de ontwikkelaarsmodus.
-2. Menu (⋮) → *Instellingen voor ontwikkelaars* → vink **Onbekende bronnen** aan.
-3. Android Auto-instellingen → *Launcher aanpassen* → vink **Trajectcontrole** aan.
-4. In de auto: Waze blijft navigeren; open Trajectcontrole om de cijfers te zien. De spraak werkt ook zonder dat het scherm open staat.
+## Markeren en indienen
 
-## Testen
+Tik tijdens het rijden op **Markeer** (gsm of Android Auto). De positie wordt vastgelegd op het moment van de tik,
+min de reactietijd. Daarna kies je:
 
-- **Rekenmotor (op je pc):** in Android Studio rechtsklik op `app/src/test/.../EngineTest` → *Run*.
-  - Zes gesimuleerde ritten, waaronder E40 richting kust met drie trajecten na elkaar, een tunnel van 30 s en GPS-ruis.
-  - Criterium: gemiddelde binnen 1 km/u en instapmoment binnen 1,5 s.
-- **Eerste echte rit:** laat Flitsmeister en deze app naast elkaar draaien. Het logboek staat in `Android/data/be.koen.trajectcontrole/files/logs/`.
-  - De `FIX`-regels kunnen opnieuw door de rekenmotor gestuurd worden. Zo kan elk verschil achteraf onderzocht worden.
+- **Begin** en later **Einde**: een nieuw traject dat exact het gereden GPS-spoor volgt. Op de gsm kies je limiet en
+  **richting** (enkel deze / beide); in Android Auto enkel de limiet, de richting pas je nadien aan op de gsm;
+- **Correctie**: het begin of einde van een bestaand traject in dezelfde rijrichting verschuiven;
+- **Later beslissen**: afwerken in *Markeringen*.
+
+Alles werkt meteen op het eigen toestel. Met **Indienen** opent een vooraf ingevuld GitHub-issue met een blok:
+
+````
+```trajectcontrole
+nieuw;id=977273904;limiet=30;beide=1;naam=Bierbeek, Koning Albertlaan;punten=lat,lon;lat,lon;…
+correctie;id=815154;kant=begin;naam=…;punten=lat,lon;…
+```
+````
+
+De workflow *Meldingen verwerken* (enkel issues van de eigenaar) zet dat om naar `data/eigen_trajecten.tsv` of
+`data/correcties.tsv`, antwoordt met een samenvatting, sluit het issue en start de update. De app haalt de nieuwe data
+op bij de volgende controle. Lukt het niet, dan blijft het issue open met de reden; **bewerk het issue** om opnieuw te
+verwerken. Hetzelfde id opnieuw indienen vervangt de vorige versie. `beide=1` (of `richting=beide`) = beide richtingen;
+een negatief id bij een correctie = enkel de omgekeerde richting. Correcties op een traject dat later door AWV-data
+vervangen wordt, vervallen; het rapport meldt dat.
 
 ## Bronnen
 
 1. **OpenStreetMap** (ODbL): alle Belgische `enforcement=average_speed`-relaties.
-2. **AWV open data** (laag `awv:Trajectcontroles` op de open-dataserver van het Agentschap Wegen en Verkeer): trajectcontroles op Vlaamse gewest- en snelwegen.
-   - Opgenomen: status *Opgeleverd* (ook als ze niet actief zijn) en *UNKNOWN*. Die laatste zijn installaties van de federale politie en de politiezones die AWV mee registreert.
-   - De limiet komt uit de AWV-laag `Snelheidsregimes_op_wegen_in_beheer_van_AWV`.
-   - Opgelet: de coördinaten staan in Lambert 2008 terwijl de laag Lambert 72 opgeeft. De pipeline rekent ze zelf om.
-   - Overlapt een AWV-traject met een bestaand traject maar verschilt de lengte, dan blijft de bestaande versie staan en meldt het rapport het verschil.
-3. **Eigen meldingen** (`data/eigen_meldingen.csv`) en **eigen trajecten** (`data/eigen_trajecten.tsv`).
+2. **AWV open data** (laag `awv:Trajectcontroles`): trajectcontroles op Vlaamse gewest- en snelwegen.
+   - Opgenomen: status *Opgeleverd* (ook als ze niet actief zijn) en *UNKNOWN* (installaties van federale politie en
+     politiezones die AWV mee registreert).
+   - Limiet uit de AWV-laag `Snelheidsregimes_op_wegen_in_beheer_van_AWV`.
+   - De coördinaten staan in Lambert 2008 terwijl de laag Lambert 72 opgeeft; de pipeline rekent ze zelf om.
+   - AWV-portaalstukken krijgen voorrang op OSM-trajecten die ze voor ≥ 80 % bedekken.
+3. **Eigen trajecten** (`data/eigen_trajecten.tsv`), **eigen meldingen** (`data/eigen_meldingen.csv`) en
+   **correcties** (`data/correcties.tsv`), uit eigen waarneming.
+
+Geen gegevens van Flitsmeister, TollTracker of andere commerciële diensten.
+
+Kaarttegels: OpenFreeMap (© OpenMapTiles, © OpenStreetMap-bijdragers).
 
 ## Trajectdata bijwerken (automatisch)
 
 ```
-elke maandag 03:17 UTC (GitHub Actions)
+elke maandag 03:17 UTC, na een melding, of manueel (GitHub Actions)
   └─ pipeline/run_pipeline.py
-       1. Overpass: alle Belgische trajectcontroles + wegen errond
-       2. verwerken, aanvullende query voor trajecten zonder wegdata, opnieuw verwerken
+       1. Overpass (meerdere servers) + AWV: alle Belgische trajectcontroles en de wegen errond
+       2. verwerken, op de weg leggen, richting en koppelingen bepalen, eigen trajecten en correcties toepassen
        3. CONTROLES: ≥ 100 trajecten · niet > 10 % minder dan vorige versie · E40 ≥ 15 · geen traject < 100 m
        4. data/segments.tsv + data/meta.json (versie, sha256) + data/RAPPORT.md
-  └─ bij wijziging of fout: issue met het rapport (= e-mail van GitHub)
+  └─ enkel bij een fout: issue "update NIET gepubliceerd" met het rapport (= e-mail van GitHub)
 app (bij openen of starten, hoogstens 1x per dag, enkel op wifi)
   └─ meta.json → nieuwere versie? → download → sha256 + ≥ 100 trajecten → vervangen
      → actief vanaf de volgende start. Lukt iets niet: vorige versie blijft.
 ```
 
-- **Faalt een controle, dan wordt er niets gepubliceerd.** Je krijgt een issue "NIET gepubliceerd" met de reden. Het gaat meestal om een tijdelijke fout in OpenStreetMap of bij Overpass. Je kunt de workflow later opnieuw draaien via *Actions → Trajectcontroles bijwerken → Run workflow*.
-- **Manueel controleren in de app:** *Instellingen → Trajectdata → Nu controleren*. Dat werkt ook via mobiele data.
-- **Zelf trajectcontroles toevoegen:** voeg een regel toe aan `data/eigen_meldingen.csv` (op github.com: bestand openen → potloodje → *Commit changes*):
-  `naam;limiet;richting;begin;einde`, bijvoorbeeld `Tiensesteenweg Kessel-Lo;50;beide;50.8812,4.7231;50.8790,4.7342`.
-  Begin en einde zijn de plaatsen van de camera's (Google Maps: lang drukken → coördinaten kopiëren). Start daarna *Actions → Trajectcontroles bijwerken → Run workflow*. Het rapport (issue) toont per regel of het traject op de weg gelegd kon worden, en zo niet, waarom.
-- **Eigen trajecten** die niet in OpenStreetMap staan (vaak gemeentelijke trajectcontroles), komen in `data/eigen_trajecten.tsv` in de repository. De wekelijkse update voegt ze samen met de OSM-data. Het rapport meldt het als zo'n traject later ook in OpenStreetMap opduikt, zodat de eigen versie weg kan. Om ze juist op de weg te leggen is er de workflow *OSM-opzoeking (hulpmiddel)*.
-- **Je eigen `correcties.tsv` gaat altijd voor** op de gedownloade data (zie `app/src/main/assets/LEESMIJ_correcties.txt`).
-- **Zelf draaien (test):** `python3 pipeline/run_pipeline.py --data data`, of `--offline export1.json export2.json` met bestaande exports.
+- **Faalt een controle, dan wordt er niets gepubliceerd.** Meestal een tijdelijke fout in OpenStreetMap of bij Overpass.
+  Opnieuw draaien: *Actions → Trajectcontroles bijwerken → Run workflow*.
+- Een geslaagde update zie je in de commitgeschiedenis ("Trajecten bijgewerkt/gecontroleerd") en in `data/RAPPORT.md`.
+- **Zelf een traject toevoegen zonder app:** regel in `data/eigen_meldingen.csv`
+  (`naam;limiet;richting;begin;einde`, bv. `Tiensesteenweg Kessel-Lo;50;beide;50.8812,4.7231;50.8790,4.7342`; begin en
+  einde = plaats van de camera's). Het rapport toont per regel of het traject op de weg gelegd kon worden.
+  Hulpmiddel om een lijn op de weg te leggen: workflow *OSM-opzoeking*.
+- Eigen trajecten (`ids ≥ 900000000`) worden samengevoegd met de OSM-/AWV-data. Duikt zo'n traject later in
+  OpenStreetMap op, dan meldt het rapport dat, zodat de eigen versie weg kan.
+- **Zelf draaien (test):** `python3 pipeline/run_pipeline.py --data data`, of `--offline export1.json export2.json`.
+- GitHub zet geplande workflows stil na 60 dagen zonder activiteit; de wekelijkse run bewaart daarom altijd
+  `meta.json` met de datum van de laatste controle.
 
-## Eenmalige installatie op GitHub
+## Testen
 
-1. Maak op github.com een **publieke** repository `trajectcontrole` aan onder `dekoene007`, zonder README.
-   - Publiek is nodig zodat de app de data kan downloaden zonder wachtwoord of token.
-   - De repository bevat enkel de app-code en OpenStreetMap-data, niets persoonlijks.
-2. Zet de inhoud van deze map erin. Met git:
-   ```
-   cd trajectcontrole
-   git init -b main
-   git add .
-   git commit -m "Trajectcontrole v0.4"
-   git remote add origin https://github.com/dekoene007/trajectcontrole.git
-   git push -u origin main
-   ```
-   Uploaden via de website kan ook. Let er dan op dat de verborgen map `.github` mee gaat, want sommige verkenners verbergen die.
-3. Op GitHub, tabblad **Actions**: start *Trajectcontroles bijwerken* een eerste keer manueel met **Run workflow**. Na 5–15 minuten:
-   - Is de run groen, dan is alles in orde.
-   - Volgt er een issue, dan veranderde OpenStreetMap sinds 4 november. Het rapport toont wat.
-4. Lukt het terugschrijven niet (fout bij *git push*): ga naar *Settings → Actions → General → Workflow permissions* en kies **Read and write permissions**.
-5. Wil je de issues per e-mail ontvangen, kijk dan na of meldingen per e-mail aan staan in je GitHub-profiel (*Settings → Notifications*).
+- **Rekenmotor:** `app/src/test/.../EngineTest` (draait ook bij elke build in Actions). Gesimuleerde ritten, o.a. de E40
+  richting kust met drie trajecten na elkaar, een tunnel van 30 s en GPS-ruis. Criterium: gemiddelde binnen 1 km/u,
+  instapmoment binnen 1,5 s.
+- **Echte ritten:** het ritlogboek staat in `Android/data/be.koen.trajectcontrole/files/logs/`. De `FIX`-regels kunnen
+  opnieuw door de rekenmotor gestuurd worden, zodat elk verschil achteraf te onderzoeken is.
 
-**Goed om te weten:** GitHub zet geplande workflows stil na 60 dagen zonder activiteit. De workflow bewaart daarom elke week `meta.json` met de datum van de laatste controle. Dat telt als activiteit, zodat de planning blijft lopen.
+## Bekende beperkingen
 
-## Stand van de data (export 3–4 november 2026)
+1. **GPS ≠ teller ≠ meting van de politie.** De app rekent met GPS-afstand langs de trajectlijn en tijd; houd marge.
+2. **De positiebol loopt ±1 s achter** door de vloeiende beweging; de berekening niet.
+3. **Tweede scherm** verschijnt enkel als de auto het instrumentenpaneel aan navigatie-apps aanbiedt.
+4. **Automatisch starten via Bluetooth** hangt af van de batterijbesparing van het toestel.
+5. **Simulaties gebruiken willekeurige GPS-ruis**; echte GPS wijkt soms een tijd in dezelfde richting af
+   (gebouwen, vangrails). Echte ritten blijven de eigenlijke validatie.
+6. **De melding vóór het begin** werkt op rechte aanlopen; in een bocht vlak voor het begin kan ze wegvallen.
 
-- **139 van 177** Belgische trajecten zijn opgenomen, waarvan 19 op wegen in beide richtingen. Bij die laatste bepaalt de app de richting tijdens het rijden.
-- **De E40 is volledig**, behalve twee kapotte stukjes bij Wetteren (4 en 9 m lang in OpenStreetMap).
-- **Niet opgenomen (37):**
-  - 10 met een rijrichting die tegen de weg in lijkt te lopen
-  - 8 met meerdere begin- of eindpunten
-  - 10 waarvoor geen route over de weg gevonden werd (3 daarvan hebben ook meerdere begin- of eindpunten)
-  - 6 met te weinig punten
-  - 3 verdacht korte
+## Onderhoud van deze documentatie
 
-  Eén rit langs zo'n traject en een regel in `correcties.tsv` lost het op. Nog beter is het traject in OpenStreetMap te verbeteren: dan neemt de volgende wekelijkse update het mee.
-
-Een traject (13590319) werd in 0.4 uitgesloten: de controles van de pipeline vonden een lijn van 0 m.
-
-Bron trajecten: © OpenStreetMap-bijdragers (ODbL).
-
-## Bekende beperkingen en risico's (eerst op de eigen auto testen)
-
-1. **Wat wel en niet gecompileerd werd.**
-   - Versie 0.2 bouwde bij jou zonder fouten.
-   - De rekenmotor, met de nieuwe melding bij nadering, is hier gecompileerd en getest.
-   - De Android-code van 0.3 en 0.4 (Bluetooth, overlay, instellingen, downloaden van data) is enkel nagelezen tegen de documentatie. Een kleine compileerfout bij de eerste build is mogelijk.
-   - De pipeline en de controles zijn hier getest met de exports van 3–4 november. Het ophalen bij Overpass zelf kon hier niet getest worden, omdat die server vanuit deze omgeving geblokkeerd is. De eerste manuele run op GitHub is dus de echte test.
-2. **Vernieuwen van het scherm in Android Auto:** de app ververst hoogstens om de 2 s. Of jouw Range Rover-host dat toelaat, moet een rit tonen. Lukt het niet, dan blijft de spraak het hoofdkanaal.
-3. **Starten vanuit de auto:** Android kan het starten van een locatieservice vanuit Android Auto weigeren als de telefoonapp nog nooit geopend werd. Start de eerste keer op de telefoon.
-4. **Automatisch starten**: de Bluetooth-trigger hangt af van hoe streng je toestel batterijbesparing toepast. Test het eerst een paar keer met de auto.
-   - *Starten op basis van beweging* (zoals Flitsmeister) zit er niet in. Daarvoor zijn Google Play-services nodig, en met Bluetooth heb je het niet nodig.
-5. **De simulatie gebruikt willekeurige GPS-ruis.** Echte GPS wijkt vaak een tijd in dezelfde richting af en kaatst terug tegen gebouwen en vangrails. De echte rit is de eigenlijke validatie.
-6. **De melding bij nadering** werkt op rechte aanlopen, zoals snelwegen en de meeste gewestwegen. In een bocht vlak voor het begin kan ze wegvallen; het traject zelf wordt wel herkend.
-
-
-## App installeren zonder Android Studio
-
-Elke wijziging aan de app wordt in GitHub Actions gebouwd (workflow *App bouwen*). De nieuwste APK staat
-altijd bij de release **app-laatste** (Releases, rechts op de startpagina van de repository). Installeer ze op
-de gsm via **UnknownAuto**, zodat Android Auto de app aanvaardt. De APK is ondertekend met de vaste sleutel in
-`app/signing/` (enkel voor persoonlijk gebruik), dus een build uit Android Studio en een build uit Actions
-kunnen elkaar zonder verwijderen bijwerken.
-
-## Markeren en indienen
-
-Tik tijdens het rijden op **Markeer** (gsm of grote zone rechtsonder in Android Auto). De positie wordt
-vastgelegd op het moment van de tik, min de reactietijd (instelbaar, standaard 0,8 s). Daarna kies je:
-
-- **Begin** en later **Einde** (met limiet): een nieuw traject dat exact het gereden GPS-spoor volgt;
-- **Correctie**: het begin of einde van een bestaand traject in dezelfde rijrichting verschuiven;
-- **Later beslissen**: afwerken in *Markeringen*.
-
-Alles werkt meteen op het eigen toestel. Met **Indienen** opent een vooraf ingevuld GitHub-issue; de workflow
-*Meldingen verwerken* (enkel issues van de eigenaar) zet het om naar `data/eigen_trajecten.tsv` of
-`data/correcties.tsv` en start de update. Correcties op een traject dat later door AWV-data vervangen wordt,
-vervallen; het rapport meldt dat.
+Bij elke nieuwe app-versie: `versionName`/`versionCode` verhogen, een sectie toevoegen in `CHANGELOG.md`
+en deze README bijwerken waar functies of werking veranderen. De build in Actions faalt als de sectie ontbreekt.
+Zie ook `CLAUDE.md`.
