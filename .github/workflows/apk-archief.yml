@@ -1,0 +1,33 @@
+name: APK-archief aanvullen
+
+# Eenmalig/hulpmiddel: maakt voor elke appversie waarvan nog een build-artefact bestaat een release
+# app-v<versie> met de APK, zodat CHANGELOG.md per versie naar de APK kan linken.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  archief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Releases per versie
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+        run: |
+          gh api "repos/$R/actions/artifacts?per_page=100" --paginate \
+            --jq '.artifacts[] | select(.expired|not) | select(.name|startswith("trajectcontrole-")) | "\(.name) \(.id) \(.created_at) \(.workflow_run.head_sha)"' \
+            | sort -k1,1 -k3,3r | awk '!s[$1]++' > lijst.txt
+          cat lijst.txt
+          while read -r NAME ID CREATED SHA; do
+            V="${NAME#trajectcontrole-}"
+            if gh release view "app-v$V" >/dev/null 2>&1; then echo "app-v$V bestaat al"; continue; fi
+            rm -rf a && mkdir a
+            gh api "repos/$R/actions/artifacts/$ID/zip" > a/a.zip && (cd a && unzip -q a.zip)
+            gh release create "app-v$V" "a/trajectcontrole-$V.apk" --target "$SHA" --latest=false \
+              --title "App $V" --notes "APK van versie $V (build $SHA). Release notes: CHANGELOG.md."
+          done < lijst.txt

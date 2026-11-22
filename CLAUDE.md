@@ -2,7 +2,8 @@
 
 - **Taal:** Nederlands (Vlaams) in code-commentaar, UI, commits en documentatie.
 - **Bij elke app-wijziging die gebruikers merken:** `versionCode` +1 en `versionName` verhogen in
-  `app/build.gradle.kts`, een sectie `## <versie> – <datum>` bovenaan in `CHANGELOG.md`, en `README.md` bijwerken
+  `app/build.gradle.kts`, een sectie `## <versie> – <datum>` bovenaan in `CHANGELOG.md` met de APK-link
+  (`**APK:** [trajectcontrole-<v>.apk](https://github.com/dekoene007/trajectcontrole/releases/download/app-v<v>/trajectcontrole-<v>.apk)`), en `README.md` bijwerken
   (versie bovenaan + de betrokken secties). De workflow *App bouwen* faalt als de sectie in `CHANGELOG.md` ontbreekt
   en zet de tekst ervan bij de release **app-laatste**.
 - **Wijzigingen aan data, pipeline of workflows** zonder nieuwe app-versie: een regel onder *Data en pipeline* in

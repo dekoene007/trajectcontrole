@@ -48,7 +48,7 @@ Boetedrempel (technische correctie BE: −6 km/u onder 100, −6 % vanaf 100):
 ## Installeren
 
 Elke wijziging aan de app wordt in GitHub Actions gebouwd (workflow *App bouwen*). De nieuwste APK staat altijd bij
-de release **app-laatste** (Releases, rechts op de startpagina van de repository), met de release notes van die versie.
+de release **app-laatste** (Releases, rechts op de startpagina van de repository), met de release notes van die versie. Elke versie blijft ook bewaard als release `app-v<versie>`; de links staan per versie in [CHANGELOG.md](CHANGELOG.md).
 
 1. Installeer de APK op de gsm via **UnknownAuto** (met Shizuku). Zo krijgt de app de Play-herkomst die Android Auto
    vereist; een gewone installatie wordt in de auto geweigerd ("Package DENIED").
