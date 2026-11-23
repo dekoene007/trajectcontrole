@@ -1,17 +1,6 @@
-# Trajectcontroles: update 2026-11-21
+# Trajectcontroles: update 2026-11-23
 
-Trajecten: 365 → **371** · nieuw 6 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611211659
-
-## Nieuw
-
-| Traject | Naam | Limiet | Lengte |
-|---|---|---|---|
-| [22074469](https://www.openstreetmap.org/relation/22074469) | Traject 22074469 | 50 | 0.6 km |
-| [22074470](https://www.openstreetmap.org/relation/22074470) | Traject 22074470 | 50 | 0.6 km |
-| [22074471](https://www.openstreetmap.org/relation/22074471) | Traject 22074471 | 50 | 0.7 km |
-| [22074472](https://www.openstreetmap.org/relation/22074472) | Traject 22074472 | 50 | 0.7 km |
-| [22075715](https://www.openstreetmap.org/relation/22075715) | Trajectcontrole N33 Ichtegem (Centrum -Noord) | 70 | 1.5 km |
-| 977273904 (eigen) | Bierbeek, Koning Albertlaan (melding #11) | 30 | 0.8 km |
+Trajecten: 371 → **371** · nieuw 0 · verdwenen 0 · limiet gewijzigd 0 · lengte gewijzigd 0 · versie 202611231256
 
 ## Eigen trajecten (data/eigen_trajecten.tsv)
 
@@ -75,4 +64,6 @@ Niet opgenomen:
 - TC0077 N0060001 6.6->7.5: lijn 1478 m past niet bij referentiepunten 900 m
 - TC0124 R0130001 0.5->9.4: lijn 2300 m past niet bij referentiepunten 8900 m
 - TC2021_339 N0080002 68->66: lijn 6780 m past niet bij referentiepunten 2000 m
+
+Geen wijzigingen.
 
